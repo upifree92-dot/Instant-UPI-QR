@@ -29,6 +29,7 @@ interface SettingsModalProps {
   config: MerchantConfig;
   onSave: (newConfig: MerchantConfig) => void;
   onResetDefaults: () => void;
+  isAdmin?: boolean;
   onOpenAdminPanel?: () => void;
 }
 
@@ -38,6 +39,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   config,
   onSave,
   onResetDefaults,
+  isAdmin = false,
   onOpenAdminPanel,
 }) => {
   const [formData, setFormData] = useState<MerchantConfig>({ ...config });
@@ -399,7 +401,7 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                 <span>{copiedSql ? 'SQL Copied!' : 'Copy SQL Schema'}</span>
               </button>
 
-              {onOpenAdminPanel && (
+              {isAdmin && onOpenAdminPanel && (
                 <button
                   type="button"
                   onClick={() => {

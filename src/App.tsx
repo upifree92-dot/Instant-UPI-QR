@@ -17,12 +17,14 @@ import { AdminPanel } from './components/AdminPanel';
 import { MerchantConfig, UserRole } from './types';
 import { announceSoundbox } from './utils/sound';
 import { buildUpiPayUrl } from './utils/upi';
-import { Volume2, CheckCircle2, Share2, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { Volume2, CheckCircle2, Share2, ShieldCheck, ArrowLeft, User, Cloud } from 'lucide-react';
 import { fetchMerchantConfigFromCloud, saveMerchantConfigToCloud } from './lib/supabase';
+import { getUserByEmail, getUserValidityInfo } from './lib/userStore';
 
 const STORAGE_KEY = 'upi_merchant_config_v1';
 const AUTH_STORAGE_KEY = 'upi_merchant_authenticated_v1';
 const USER_ROLE_KEY = 'upi_merchant_user_role';
+const LOGGED_IN_USER_KEY = 'upi_merchant_logged_in_user';
 const STORE_NAME_KEY = 'upi_merchant_store_name';
 const UPI_ID_KEY = 'upi_merchant_vpa_id';
 
@@ -84,12 +86,30 @@ export default function App() {
   const [userRole, setUserRole] = useState<UserRole>(() => {
     try {
       const saved = localStorage.getItem(USER_ROLE_KEY);
-      if (saved === 'admin' || saved === 'merchant') return saved;
+      if (saved === 'admin' || saved === 'merchant' || saved === 'customer') return saved as UserRole;
     } catch {
       // fallback
     }
-    return 'merchant';
+    return 'customer';
   });
+
+  const [currentUserEmail, setCurrentUserEmail] = useState<string>(() => {
+    try {
+      return localStorage.getItem(LOGGED_IN_USER_KEY) || '';
+    } catch {
+      return '';
+    }
+  });
+
+  const currentUser = useMemo(() => {
+    if (!currentUserEmail) return undefined;
+    return getUserByEmail(currentUserEmail);
+  }, [currentUserEmail]);
+
+  const customerValidity = useMemo(() => {
+    if (!currentUser) return null;
+    return getUserValidityInfo(currentUser);
+  }, [currentUser]);
 
   const [currentView, setCurrentView] = useState<'terminal' | 'admin'>(() => {
     try {
@@ -101,15 +121,28 @@ export default function App() {
     return 'terminal';
   });
 
-  const handleLoginSuccess = (_user: string, role: UserRole) => {
+  const handleLoginSuccess = (user: string, role: UserRole) => {
     try {
       localStorage.setItem(AUTH_STORAGE_KEY, 'true');
       localStorage.setItem(USER_ROLE_KEY, role);
+      localStorage.setItem(LOGGED_IN_USER_KEY, user);
     } catch {
       // storage error fallback
     }
     setIsAuthenticated(true);
     setUserRole(role);
+    setCurrentUserEmail(user);
+
+    // If customer has a registered store/businessName, sync it to config
+    const registered = getUserByEmail(user);
+    if (registered && registered.businessName) {
+      setConfig((prev) => ({
+        ...prev,
+        storeName: registered.businessName || prev.storeName,
+      }));
+    }
+
+    // Only allow admin into admin panel
     setCurrentView(role === 'admin' ? 'admin' : 'terminal');
   };
 
@@ -117,12 +150,14 @@ export default function App() {
     try {
       localStorage.removeItem(AUTH_STORAGE_KEY);
       localStorage.removeItem(USER_ROLE_KEY);
+      localStorage.removeItem(LOGGED_IN_USER_KEY);
       // NOTE: We do NOT wipe out STORE_NAME_KEY or UPI_ID_KEY so merchant details persist
     } catch {
       // storage error fallback
     }
     setIsAuthenticated(false);
-    setUserRole('merchant');
+    setUserRole('customer');
+    setCurrentUserEmail('');
     setCurrentView('terminal');
     setBaseAmount(0);
   };
@@ -260,8 +295,8 @@ export default function App() {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
   }
 
-  // If currently in Admin Panel view
-  if (currentView === 'admin') {
+  // If currently in Admin Panel view - Strictly restricted to admin role only
+  if (currentView === 'admin' && userRole === 'admin') {
     return (
       <AdminPanel
         config={config}
@@ -302,8 +337,47 @@ export default function App() {
           language={config.language}
           onToggleLanguage={handleToggleLanguage}
           isAdmin={userRole === 'admin'}
-          onSwitchToAdmin={() => setCurrentView('admin')}
+          onSwitchToAdmin={userRole === 'admin' ? () => setCurrentView('admin') : undefined}
         />
+
+        {/* Customer Account & Supabase Cloud Connection Status Card */}
+        {userRole !== 'admin' && (
+          <div className="bg-white/95 rounded-2xl p-2.5 px-3.5 border border-emerald-200 shadow-2xs flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-emerald-100/90 text-emerald-800 flex items-center justify-center font-extrabold shrink-0">
+                <User className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="font-extrabold text-slate-800 text-xs truncate">
+                  {currentUser?.businessName || currentUser?.name || config.storeName}
+                </div>
+                <div className="text-[11px] font-bold text-emerald-700 flex items-center gap-1.5 flex-wrap">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>
+                    Valid: {customerValidity?.planLabel || 'Active Plan'}
+                  </span>
+                  {customerValidity && !customerValidity.isLifetime && (
+                    <span className="text-slate-500 font-medium">
+                      ({customerValidity.daysRemaining} days left)
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Supabase Connect Button - Opens Settings */}
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-[11px] font-bold shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
+              title="Supabase Cloud Database Connected - Open Settings to view details"
+            >
+              <Cloud className="w-3.5 h-3.5 text-emerald-600 fill-emerald-500 shrink-0" />
+              <span className="hidden xs:inline">Supabase</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            </button>
+          </div>
+        )}
 
         {/* Main UPI QR Display Card */}
         <UpiCard
@@ -376,7 +450,8 @@ export default function App() {
         config={config}
         onSave={handleSaveConfig}
         onResetDefaults={handleResetDefaults}
-        onOpenAdminPanel={() => setCurrentView('admin')}
+        isAdmin={userRole === 'admin'}
+        onOpenAdminPanel={userRole === 'admin' ? () => setCurrentView('admin') : undefined}
       />
 
       {/* Share Modal */}

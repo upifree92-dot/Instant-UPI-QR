@@ -183,6 +183,17 @@ export function saveRegisteredUsers(users: RegisteredUser[]): void {
   }
 }
 
+export function getUserByEmail(emailOrId: string): RegisteredUser | undefined {
+  const users = getRegisteredUsers();
+  const clean = emailOrId.trim().toLowerCase();
+  return users.find(
+    (u) =>
+      u.email.toLowerCase() === clean ||
+      u.id === emailOrId ||
+      (u.phone && u.phone.toLowerCase() === clean)
+  );
+}
+
 export function registerCustomer(params: {
   name: string;
   email: string;

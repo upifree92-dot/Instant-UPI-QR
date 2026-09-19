@@ -54,12 +54,12 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right actions */}
       <div className="flex items-center gap-1.5 sm:gap-2">
-        {onSwitchToAdmin && (
+        {isAdmin && onSwitchToAdmin && (
           <button
             id="btn-header-admin"
             type="button"
             onClick={onSwitchToAdmin}
-            title="Open Admin Control Panel"
+            title="Open Admin Control Panel (Admin Only)"
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-800 bg-slate-900 text-emerald-400 font-extrabold text-xs hover:bg-slate-800 active:scale-95 transition-all shadow-xs cursor-pointer"
           >
             <ShieldCheck className="w-3.5 h-3.5 stroke-[2.4]" />
