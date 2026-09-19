@@ -1,0 +1,8 @@
+{
+  "name": "Remix Instant UPI QR Generator",
+  "description": "Instant UPI QR Code Generator with automatic extra percentage calculation for merchants and shops.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
