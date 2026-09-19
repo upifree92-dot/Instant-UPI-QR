@@ -350,7 +350,7 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                   Admin Control Panel
                 </h1>
                 <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-300">
-                  User: demo11
+                  Administrator
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-medium">
@@ -560,8 +560,8 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
               <Users className="w-3.5 h-3.5 text-emerald-600" />
             </div>
             <div className="mt-1">
-              <span className="font-extrabold text-sm text-emerald-700 font-mono">
-                demo11
+              <span className="font-extrabold text-sm text-emerald-700">
+                Master Admin
               </span>
             </div>
           </div>
@@ -778,7 +778,7 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      हिंदी (Hindi)
+                      Hindi
                     </button>
                   </div>
                 </div>
@@ -801,7 +801,7 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                 className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-sm shadow-sm transition-all cursor-pointer"
               >
                 <Save className="w-4 h-4" />
-                <span>Save All Changes (सेव करें)</span>
+                <span>Save All Changes</span>
               </button>
             </div>
           </form>
@@ -1413,49 +1413,6 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                   );
                 })
               )}
-            </div>
-
-            {/* Permanent Reference Accounts */}
-            <div className="pt-3 border-t border-slate-200 space-y-3">
-              <h3 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">
-                Built-in System Accounts
-              </h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Admin demo11 */}
-                <div className="p-3 rounded-xl bg-slate-900 text-white border border-slate-800 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="font-extrabold text-xs text-emerald-400 flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      Admin Account
-                    </span>
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">
-                      Master
-                    </span>
-                  </div>
-                  <div className="text-xs font-mono bg-slate-800/80 p-2 rounded-lg flex justify-between">
-                    <span>demo11</span>
-                    <span className="text-emerald-300">pass: demo11</span>
-                  </div>
-                </div>
-
-                {/* Merchant demo@gmail.com */}
-                <div className="p-3 rounded-xl bg-slate-100 border border-slate-200 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="font-extrabold text-xs text-slate-800 flex items-center gap-1">
-                      <Store className="w-3.5 h-3.5 text-emerald-600" />
-                      Cashier / Merchant
-                    </span>
-                    <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full font-bold">
-                      Terminal
-                    </span>
-                  </div>
-                  <div className="text-xs font-mono bg-white p-2 rounded-lg border border-slate-200 flex justify-between">
-                    <span>demo@gmail.com</span>
-                    <span className="text-slate-900 font-bold">pass: demo</span>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         )}

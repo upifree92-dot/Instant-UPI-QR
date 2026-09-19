@@ -8,7 +8,6 @@ import {
   ShieldCheck,
   QrCode,
   AlertCircle,
-  Sparkles,
   UserCheck,
   UserPlus,
   User,
@@ -133,22 +132,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     }, 300);
   };
 
-  const handleFillAdmin = () => {
-    setMode('login');
-    setUsername('demo11');
-    setPassword('demo11');
-    setError(null);
-    setSuccessMsg(null);
-  };
-
-  const handleFillMerchant = () => {
-    setMode('login');
-    setUsername('demo@gmail.com');
-    setPassword('demo');
-    setError(null);
-    setSuccessMsg(null);
-  };
-
   return (
     <div className="min-h-screen bg-[#f0f5f3] flex flex-col items-center justify-center py-8 px-4 selection:bg-emerald-200">
       <div className="w-full max-w-md">
@@ -183,7 +166,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               }`}
             >
               <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Login (लॉगिन)</span>
+              <span>Login</span>
             </button>
             <button
               id="tab-register"
@@ -199,57 +182,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               }`}
             >
               <UserPlus className="w-3.5 h-3.5" />
-              <span>Register (नया खाता)</span>
+              <span>Register</span>
             </button>
           </div>
-
-          {/* Quick Demo Credentials Tabs / Buttons (Shown in Login mode) */}
-          {mode === 'login' && (
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 mb-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Quick Fill Credentials:</span>
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  id="btn-fill-admin"
-                  type="button"
-                  onClick={handleFillAdmin}
-                  className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-left transition-all active:scale-95 cursor-pointer"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-emerald-800">
-                      Admin Panel
-                    </span>
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  </div>
-                  <div className="text-[11px] font-mono text-slate-800 font-bold mt-0.5">
-                    demo11 / demo11
-                  </div>
-                </button>
-
-                <button
-                  id="btn-fill-merchant"
-                  type="button"
-                  onClick={handleFillMerchant}
-                  className="p-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-left transition-all active:scale-95 cursor-pointer"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-extrabold uppercase tracking-wide text-amber-800">
-                      Merchant
-                    </span>
-                    <UserCheck className="w-3.5 h-3.5 text-amber-600" />
-                  </div>
-                  <div className="text-[11px] font-mono text-slate-800 font-bold mt-0.5">
-                    demo / demo
-                  </div>
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* Error Message */}
           {error && (
@@ -494,7 +429,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               {/* Validity Plan Option */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1 flex items-center justify-between">
-                  <span>Validity Duration (वैधता अवधि)</span>
+                  <span>Validity Duration</span>
                   <span className="text-[10px] text-emerald-700 font-bold normal-case">
                     Admin validated
                   </span>
@@ -535,7 +470,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 className="w-full mt-2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-extrabold text-sm shadow-md shadow-emerald-700/20 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-70"
               >
                 <UserPlus className="w-4 h-4" />
-                <span>{isLoading ? 'Creating account...' : 'Register Account (खाता बनाएं)'}</span>
+                <span>{isLoading ? 'Creating account...' : 'Register Account'}</span>
               </button>
 
               <div className="text-center pt-1">
@@ -553,7 +488,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
             <div className="flex items-center gap-1.5">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Admin: demo11 / demo11</span>
+              <span>Secure UPI Merchant Portal</span>
             </div>
             <span>v2.1 Realtime</span>
           </div>

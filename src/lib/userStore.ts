@@ -123,21 +123,6 @@ const DEFAULT_USERS: RegisteredUser[] = [
     isNotificationRead: true,
   },
   {
-    id: 'user_merchant_demo',
-    name: 'Ramesh Sharma (Demo Merchant)',
-    email: 'demo@gmail.com',
-    password: 'demo',
-    phone: '9876543210',
-    businessName: 'Sharma General Store',
-    role: 'merchant',
-    status: 'active',
-    validityPlan: '1_year',
-    validUntil: oneYearOut.toISOString(),
-    validFrom: new Date(Date.now() - 86400000).toISOString(),
-    registeredAt: new Date(Date.now() - 86400000).toISOString(),
-    isNotificationRead: true,
-  },
-  {
     id: 'user_cust_anita',
     name: 'Anita Verma',
     email: 'anita@gmail.com',
@@ -145,12 +130,12 @@ const DEFAULT_USERS: RegisteredUser[] = [
     phone: '9823456789',
     businessName: 'Verma Collection',
     role: 'customer',
-    status: 'pending',
-    validityPlan: '1_month',
-    validUntil: oneMonthOut.toISOString(),
+    status: 'active',
+    validityPlan: '3_months',
+    validUntil: new Date(Date.now() + 86400000 * 90).toISOString(),
     validFrom: new Date().toISOString(),
-    registeredAt: new Date(Date.now() - 1800000).toISOString(),
-    isNotificationRead: false,
+    registeredAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+    isNotificationRead: true,
   },
 ];
 
@@ -160,7 +145,15 @@ export function getRegisteredUsers(): RegisteredUser[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        // Filter out any legacy demo merchant accounts to keep admin clean
+        const cleaned = parsed.filter(
+          (u) => u.id !== 'user_merchant_demo' && u.email !== 'demo@gmail.com'
+        );
+        // Ensure admin user exists
+        if (!cleaned.some((u) => u.email === 'demo11')) {
+          cleaned.unshift(DEFAULT_USERS[0]);
+        }
+        return cleaned;
       }
     }
   } catch (err) {
@@ -181,6 +174,32 @@ export function saveRegisteredUsers(users: RegisteredUser[]): void {
   } catch (err) {
     console.error('Failed to save users:', err);
   }
+}
+
+export function updateUserAccountName(
+  userIdOrEmail: string,
+  newBusinessName: string,
+  newCustomerName?: string
+): { success: boolean; user?: RegisteredUser } {
+  const users = getRegisteredUsers();
+  const clean = userIdOrEmail.trim().toLowerCase();
+  const idx = users.findIndex(
+    (u) =>
+      u.email.toLowerCase() === clean ||
+      u.id === userIdOrEmail ||
+      (u.phone && u.phone.toLowerCase() === clean)
+  );
+  if (idx === -1) {
+    return { success: false };
+  }
+  if (newBusinessName.trim()) {
+    users[idx].businessName = newBusinessName.trim();
+  }
+  if (newCustomerName && newCustomerName.trim()) {
+    users[idx].name = newCustomerName.trim();
+  }
+  saveRegisteredUsers(users);
+  return { success: true, user: users[idx] };
 }
 
 export function getUserByEmail(emailOrId: string): RegisteredUser | undefined {
