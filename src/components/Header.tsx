@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, RefreshCw, LogOut, QrCode, Globe, Cloud } from 'lucide-react';
+import { Settings, RefreshCw, LogOut, QrCode, Globe, Cloud, ShieldCheck } from 'lucide-react';
 
 interface HeaderProps {
   onOpenSettings: () => void;
@@ -8,6 +8,8 @@ interface HeaderProps {
   language?: 'hi' | 'en';
   onToggleLanguage?: () => void;
   cloudConnected?: boolean;
+  isAdmin?: boolean;
+  onSwitchToAdmin?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -17,6 +19,8 @@ export const Header: React.FC<HeaderProps> = ({
   language = 'en',
   onToggleLanguage,
   cloudConnected = true,
+  isAdmin = false,
+  onSwitchToAdmin,
 }) => {
   return (
     <header className="flex items-center justify-between py-3 px-3 sm:px-4 bg-transparent max-w-md mx-auto w-full">
@@ -50,13 +54,26 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right actions */}
       <div className="flex items-center gap-1.5 sm:gap-2">
+        {onSwitchToAdmin && (
+          <button
+            id="btn-header-admin"
+            type="button"
+            onClick={onSwitchToAdmin}
+            title="Open Admin Control Panel"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-800 bg-slate-900 text-emerald-400 font-extrabold text-xs hover:bg-slate-800 active:scale-95 transition-all shadow-xs cursor-pointer"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 stroke-[2.4]" />
+            <span>Admin</span>
+          </button>
+        )}
+
         {onToggleLanguage && (
           <button
             id="btn-toggle-lang"
             type="button"
             onClick={onToggleLanguage}
             title={language === 'en' ? 'Switch to Hindi (हिन्दी)' : 'Switch to English'}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs hover:bg-slate-50 active:scale-95 transition-all shadow-xs"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs hover:bg-slate-50 active:scale-95 transition-all shadow-xs cursor-pointer"
           >
             <Globe className="w-3.5 h-3.5 text-emerald-600 stroke-[2.2]" />
             <span>{language === 'en' ? 'EN' : 'HI'}</span>
@@ -67,7 +84,7 @@ export const Header: React.FC<HeaderProps> = ({
           id="btn-settings"
           type="button"
           onClick={onOpenSettings}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-400 bg-emerald-50/80 text-emerald-800 font-bold text-sm hover:bg-emerald-100/80 active:scale-95 transition-all shadow-xs"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-400 bg-emerald-50/80 text-emerald-800 font-bold text-sm hover:bg-emerald-100/80 active:scale-95 transition-all shadow-xs cursor-pointer"
         >
           <Settings className="w-4 h-4 stroke-[2.2] text-emerald-700 animate-spin-slow" />
           <span>Settings</span>
@@ -78,7 +95,7 @@ export const Header: React.FC<HeaderProps> = ({
           type="button"
           onClick={onReset}
           title="Reset to 0"
-          className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 active:scale-95 transition-all shadow-xs flex items-center justify-center"
+          className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 active:scale-95 transition-all shadow-xs flex items-center justify-center cursor-pointer"
         >
           <RefreshCw className="w-4 h-4 stroke-[2]" />
         </button>
@@ -96,3 +113,4 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
+

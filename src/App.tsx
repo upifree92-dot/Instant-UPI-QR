@@ -13,14 +13,16 @@ import { ShareModal } from './components/ShareModal';
 import { PaymentSuccessModal } from './components/PaymentSuccessModal';
 import { SoundboxCard } from './components/SoundboxCard';
 import { LoginPage } from './components/LoginPage';
-import { MerchantConfig } from './types';
+import { AdminPanel } from './components/AdminPanel';
+import { MerchantConfig, UserRole } from './types';
 import { announceSoundbox } from './utils/sound';
 import { buildUpiPayUrl } from './utils/upi';
-import { Volume2, CheckCircle2, Share2 } from 'lucide-react';
+import { Volume2, CheckCircle2, Share2, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { fetchMerchantConfigFromCloud, saveMerchantConfigToCloud } from './lib/supabase';
 
 const STORAGE_KEY = 'upi_merchant_config_v1';
 const AUTH_STORAGE_KEY = 'upi_merchant_authenticated_v1';
+const USER_ROLE_KEY = 'upi_merchant_user_role';
 const STORE_NAME_KEY = 'upi_merchant_store_name';
 const UPI_ID_KEY = 'upi_merchant_vpa_id';
 
@@ -79,23 +81,49 @@ export default function App() {
     amount: number;
   }>({ show: false, amount: 0 });
 
-  const handleLoginSuccess = (_userEmail: string) => {
+  const [userRole, setUserRole] = useState<UserRole>(() => {
+    try {
+      const saved = localStorage.getItem(USER_ROLE_KEY);
+      if (saved === 'admin' || saved === 'merchant') return saved;
+    } catch {
+      // fallback
+    }
+    return 'merchant';
+  });
+
+  const [currentView, setCurrentView] = useState<'terminal' | 'admin'>(() => {
+    try {
+      const saved = localStorage.getItem(USER_ROLE_KEY);
+      if (saved === 'admin') return 'admin';
+    } catch {
+      // fallback
+    }
+    return 'terminal';
+  });
+
+  const handleLoginSuccess = (_user: string, role: UserRole) => {
     try {
       localStorage.setItem(AUTH_STORAGE_KEY, 'true');
+      localStorage.setItem(USER_ROLE_KEY, role);
     } catch {
       // storage error fallback
     }
     setIsAuthenticated(true);
+    setUserRole(role);
+    setCurrentView(role === 'admin' ? 'admin' : 'terminal');
   };
 
   const handleLogout = () => {
     try {
       localStorage.removeItem(AUTH_STORAGE_KEY);
+      localStorage.removeItem(USER_ROLE_KEY);
       // NOTE: We do NOT wipe out STORE_NAME_KEY or UPI_ID_KEY so merchant details persist
     } catch {
       // storage error fallback
     }
     setIsAuthenticated(false);
+    setUserRole('merchant');
+    setCurrentView('terminal');
     setBaseAmount(0);
   };
 
@@ -227,15 +255,45 @@ export default function App() {
     }, 4000);
   };
 
-  // If user is not authenticated, show Merchant Login Page
+  // If user is not authenticated, show Merchant / Admin Login Page
   if (!isAuthenticated) {
     return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  // If currently in Admin Panel view
+  if (currentView === 'admin') {
+    return (
+      <AdminPanel
+        config={config}
+        onSaveConfig={handleSaveConfig}
+        onSwitchToTerminal={() => setCurrentView('terminal')}
+        onLogout={handleLogout}
+      />
+    );
   }
 
   return (
     <div className="min-h-screen bg-[#f0f5f3] flex flex-col items-center py-4 px-3 sm:px-4 selection:bg-emerald-200">
       {/* Container simulating smartphone/counter view */}
       <div className="w-full max-w-md flex flex-col space-y-3.5 pb-8">
+        {/* Admin Bar if logged in as Admin */}
+        {userRole === 'admin' && (
+          <div className="bg-slate-900 text-white px-3.5 py-2 rounded-xl flex items-center justify-between text-xs border border-emerald-500/40 shadow-xs">
+            <div className="flex items-center gap-1.5 font-bold">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span>Admin Preview Mode (demo11)</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCurrentView('admin')}
+              className="text-[11px] font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+            >
+              <span>Admin Panel</span>
+              <span>&rarr;</span>
+            </button>
+          </div>
+        )}
+
         {/* Top Header */}
         <Header
           onOpenSettings={() => setIsSettingsOpen(true)}
@@ -243,6 +301,8 @@ export default function App() {
           onExit={handleLogout}
           language={config.language}
           onToggleLanguage={handleToggleLanguage}
+          isAdmin={userRole === 'admin'}
+          onSwitchToAdmin={() => setCurrentView('admin')}
         />
 
         {/* Main UPI QR Display Card */}
@@ -316,6 +376,7 @@ export default function App() {
         config={config}
         onSave={handleSaveConfig}
         onResetDefaults={handleResetDefaults}
+        onOpenAdminPanel={() => setCurrentView('admin')}
       />
 
       {/* Share Modal */}

@@ -13,16 +13,7 @@ interface QuickOption {
   amount: number;
 }
 
-const DEFAULT_PRESETS: QuickOption[] = [
-  { amount: 50 },
-  { amount: 80 },
-  { amount: 100 },
-  { amount: 200 },
-  { amount: 500 },
-  { amount: 1000 },
-  { amount: 2000 },
-  { amount: 2020 },
-];
+const FALLBACK_PRESETS: number[] = [50, 80, 100, 200, 500, 1000, 2000, 2020];
 
 export const AmountSection: React.FC<AmountSectionProps> = ({
   config,
@@ -30,6 +21,19 @@ export const AmountSection: React.FC<AmountSectionProps> = ({
   baseAmount,
   onAmountChange,
 }) => {
+  const [activePresets] = React.useState<number[]>(() => {
+    try {
+      const saved = localStorage.getItem('upi_merchant_presets_list');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // fallback
+    }
+    return FALLBACK_PRESETS;
+  });
+
   // Compute calculated QR amount for any base amount
   const calculateQrAmount = (base: number): number => {
     if (!config.isExtraEnabled || config.extraPercentage <= 0) {
@@ -185,15 +189,15 @@ export const AmountSection: React.FC<AmountSectionProps> = ({
 
       {/* Quick Amounts Grid matching screenshot */}
       <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
-        {DEFAULT_PRESETS.map((item) => {
-          const qrVal = calculateQrAmount(item.amount);
-          const isSelected = baseAmount === item.amount;
+        {activePresets.map((amountVal) => {
+          const qrVal = calculateQrAmount(amountVal);
+          const isSelected = baseAmount === amountVal;
 
           return (
             <button
-              key={item.amount}
+              key={amountVal}
               type="button"
-              onClick={() => onAmountChange(item.amount)}
+              onClick={() => onAmountChange(amountVal)}
               className={`px-3 py-2.5 rounded-xl text-center transition-all flex items-center justify-center gap-1 font-medium active:scale-98 ${
                 isSelected
                   ? 'border-2 border-emerald-500 bg-emerald-50/70 text-emerald-950 font-bold shadow-xs'
@@ -201,7 +205,7 @@ export const AmountSection: React.FC<AmountSectionProps> = ({
               }`}
             >
               <span className="text-sm font-bold text-slate-900">
-                ₹{item.amount}
+                ₹{amountVal}
               </span>
               <span
                 className={`text-xs font-semibold ${

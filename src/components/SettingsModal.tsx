@@ -29,6 +29,7 @@ interface SettingsModalProps {
   config: MerchantConfig;
   onSave: (newConfig: MerchantConfig) => void;
   onResetDefaults: () => void;
+  onOpenAdminPanel?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -37,6 +38,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   config,
   onSave,
   onResetDefaults,
+  onOpenAdminPanel,
 }) => {
   const [formData, setFormData] = useState<MerchantConfig>({ ...config });
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -396,6 +398,21 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                 )}
                 <span>{copiedSql ? 'SQL Copied!' : 'Copy SQL Schema'}</span>
               </button>
+
+              {onOpenAdminPanel && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenAdminPanel();
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-emerald-500/50 text-emerald-300 font-bold text-xs transition-all cursor-pointer"
+                  title="Switch to Admin Control Panel"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Admin Panel (demo11)</span>
+                </button>
+              )}
             </div>
           </div>
 
