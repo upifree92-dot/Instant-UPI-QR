@@ -15,7 +15,7 @@ import { SoundboxCard } from './components/SoundboxCard';
 import { MerchantConfig } from './types';
 import { announceSoundbox } from './utils/sound';
 import { buildUpiPayUrl } from './utils/upi';
-import { Volume2, CheckCircle2, Share2, MessageCircle } from 'lucide-react';
+import { Volume2, CheckCircle2, Share2 } from 'lucide-react';
 
 const STORAGE_KEY = 'upi_merchant_config_v1';
 
@@ -75,25 +75,6 @@ export default function App() {
   const upiUrl = useMemo(() => {
     return buildUpiPayUrl(config, finalAmount);
   }, [config, finalAmount]);
-
-  // Direct WhatsApp Share of selected payment
-  const handleQuickWhatsAppShare = () => {
-    const displayAmt =
-      finalAmount > 0
-        ? finalAmount % 1 === 0
-          ? finalAmount
-          : finalAmount.toFixed(2)
-        : null;
-
-    const message = displayAmt
-      ? `*Payment Request from ${config.storeName}*\n💰 *Amount to Pay: ₹${displayAmt}*\n\n👉 Click to pay instantly using GPay, PhonePe, Paytm or BHIM UPI:\n${upiUrl}`
-      : `*UPI Payment Request from ${config.storeName}*\n\n👉 Pay to UPI ID: *${config.upiId}*\nClick to pay:\n${upiUrl}`;
-
-    window.open(
-      `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`,
-      '_blank'
-    );
-  };
 
   // Toggle extra percentage surcharge ON/OFF
   const handleToggleExtra = () => {
@@ -172,29 +153,18 @@ export default function App() {
         />
 
         {/* Share Selected Amount & QR Section */}
-        <div className="flex items-center gap-2 px-1 pt-0.5">
-          <button
-            id="btn-whatsapp-share"
-            type="button"
-            onClick={handleQuickWhatsAppShare}
-            className="flex-1 flex items-center justify-center gap-2 py-3 px-3.5 rounded-2xl bg-[#25D366] hover:bg-[#20bd5a] text-white text-xs sm:text-sm font-extrabold shadow-sm active:scale-98 transition-all cursor-pointer"
-            title="Send this payment directly to customer on WhatsApp"
-          >
-            <MessageCircle className="w-4 h-4 fill-current" />
-            <span>
-              WhatsApp {finalAmount > 0 ? `(₹${finalAmount})` : 'QR'}
-            </span>
-          </button>
-
+        <div className="px-1 pt-0.5">
           <button
             id="btn-share-all"
             type="button"
             onClick={() => setIsShareModalOpen(true)}
-            className="flex items-center justify-center gap-1.5 py-3 px-3.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-extrabold shadow-sm active:scale-98 transition-all cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-extrabold shadow-sm active:scale-98 transition-all cursor-pointer"
             title="Share QR image, link, or send to other apps"
           >
             <Share2 className="w-4 h-4" />
-            <span>Share QR</span>
+            <span>
+              Share QR {finalAmount > 0 ? `(₹${finalAmount % 1 === 0 ? finalAmount : finalAmount.toFixed(2)})` : ''}
+            </span>
           </button>
         </div>
 

@@ -5,7 +5,6 @@ import {
   Copy,
   Check,
   Download,
-  MessageCircle,
   ExternalLink,
   ShieldCheck,
 } from 'lucide-react';
@@ -44,11 +43,6 @@ export const ShareModal: React.FC<ShareModalProps> = ({
   const shareText = displayAmount
     ? `*Payment Request from ${config.storeName}*\n💰 *Amount: ₹${displayAmount}*\n\n👉 Click the link to pay instantly using Google Pay, PhonePe, Paytm or BHIM UPI:\n${upiUrl}`
     : `*UPI Payment Request from ${config.storeName}*\n\n👉 Pay to UPI ID: *${config.upiId}*\nClick to pay:\n${upiUrl}`;
-
-  // WhatsApp direct share link
-  const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(
-    shareText
-  )}`;
 
   // Copy payment link
   const handleCopy = () => {
@@ -91,7 +85,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({
           url: upiUrl,
         });
       } else {
-        window.open(whatsappUrl, '_blank');
+        handleCopy();
       }
     } catch {
       // User cancelled or share unavailable
@@ -174,19 +168,6 @@ export const ShareModal: React.FC<ShareModalProps> = ({
               </div>
             </div>
           )}
-
-          {/* Share on WhatsApp Button */}
-          <a
-            href={whatsappUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold text-sm shadow-sm active:scale-98 transition-all"
-          >
-            <MessageCircle className="w-5 h-5 fill-current" />
-            <span>
-              Share on WhatsApp {finalAmount > 0 ? `(₹${displayAmount})` : ''}
-            </span>
-          </a>
 
           {/* System Share (All Apps) */}
           <button
