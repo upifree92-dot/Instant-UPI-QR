@@ -12,12 +12,17 @@ import { SettingsModal } from './components/SettingsModal';
 import { ShareModal } from './components/ShareModal';
 import { PaymentSuccessModal } from './components/PaymentSuccessModal';
 import { SoundboxCard } from './components/SoundboxCard';
+import { LoginPage } from './components/LoginPage';
 import { MerchantConfig } from './types';
 import { announceSoundbox } from './utils/sound';
 import { buildUpiPayUrl } from './utils/upi';
 import { Volume2, CheckCircle2, Share2 } from 'lucide-react';
+import { fetchMerchantConfigFromCloud, saveMerchantConfigToCloud } from './lib/supabase';
 
 const STORAGE_KEY = 'upi_merchant_config_v1';
+const AUTH_STORAGE_KEY = 'upi_merchant_authenticated_v1';
+const STORE_NAME_KEY = 'upi_merchant_store_name';
+const UPI_ID_KEY = 'upi_merchant_vpa_id';
 
 const DEFAULT_CONFIG: MerchantConfig = {
   storeName: 'Sharma General Store',
@@ -34,9 +39,24 @@ export default function App() {
   const [config, setConfig] = useState<MerchantConfig>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
+      const savedStoreName = localStorage.getItem(STORE_NAME_KEY);
+      const savedUpiId = localStorage.getItem(UPI_ID_KEY);
+
       if (saved) {
         const parsed = JSON.parse(saved);
-        return { ...DEFAULT_CONFIG, ...parsed, language: parsed.language || 'en' };
+        return {
+          ...DEFAULT_CONFIG,
+          ...parsed,
+          storeName: savedStoreName || parsed.storeName || DEFAULT_CONFIG.storeName,
+          upiId: savedUpiId || parsed.upiId || DEFAULT_CONFIG.upiId,
+          language: parsed.language || 'en',
+        };
+      } else if (savedStoreName || savedUpiId) {
+        return {
+          ...DEFAULT_CONFIG,
+          storeName: savedStoreName || DEFAULT_CONFIG.storeName,
+          upiId: savedUpiId || DEFAULT_CONFIG.upiId,
+        };
       }
     } catch {
       // fallback
@@ -47,15 +67,98 @@ export default function App() {
   const [baseAmount, setBaseAmount] = useState<number>(0);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(AUTH_STORAGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [paymentSuccessToast, setPaymentSuccessToast] = useState<{
     show: boolean;
     amount: number;
   }>({ show: false, amount: 0 });
 
-  // Save config to localStorage on change
+  const handleLoginSuccess = (_userEmail: string) => {
+    try {
+      localStorage.setItem(AUTH_STORAGE_KEY, 'true');
+    } catch {
+      // storage error fallback
+    }
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem(AUTH_STORAGE_KEY);
+      // NOTE: We do NOT wipe out STORE_NAME_KEY or UPI_ID_KEY so merchant details persist
+    } catch {
+      // storage error fallback
+    }
+    setIsAuthenticated(false);
+    setBaseAmount(0);
+  };
+
+  // Fetch latest config from Supabase Cloud on startup
+  useEffect(() => {
+    fetchMerchantConfigFromCloud().then((cloudConfig) => {
+      if (cloudConfig && (cloudConfig.storeName || cloudConfig.upiId)) {
+        setConfig((prev) => ({
+          ...prev,
+          ...cloudConfig,
+          storeName: cloudConfig.storeName || prev.storeName,
+          upiId: cloudConfig.upiId || prev.upiId,
+        }));
+      }
+    });
+  }, []);
+
+  // Save config to localStorage immediately & whenever updated, and sync to Supabase Cloud
+  const handleSaveConfig = (newConfig: MerchantConfig) => {
+    const updated: MerchantConfig = {
+      ...newConfig,
+      storeName: newConfig.storeName.trim() || 'Sharma General Store',
+      upiId: newConfig.upiId.trim() || 'sharmastore@okhdfcbank',
+    };
+    setConfig(updated);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      localStorage.setItem(STORE_NAME_KEY, updated.storeName);
+      localStorage.setItem(UPI_ID_KEY, updated.upiId);
+    } catch (e) {
+      console.error('Failed to write to localStorage', e);
+    }
+    // Background cloud sync to Supabase
+    saveMerchantConfigToCloud(updated);
+  };
+
+  const handleResetDefaults = () => {
+    // Preserve custom store name & UPI address so user's work is never lost!
+    setConfig((prev) => {
+      const updated: MerchantConfig = {
+        ...DEFAULT_CONFIG,
+        storeName: prev.storeName,
+        upiId: prev.upiId,
+      };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+  };
+
+  // Keep localStorage in sync with config changes
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+      if (config.storeName) {
+        localStorage.setItem(STORE_NAME_KEY, config.storeName);
+      }
+      if (config.upiId) {
+        localStorage.setItem(UPI_ID_KEY, config.upiId);
+      }
     } catch {
       // storage error fallback
     }
@@ -124,6 +227,11 @@ export default function App() {
     }, 4000);
   };
 
+  // If user is not authenticated, show Merchant Login Page
+  if (!isAuthenticated) {
+    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+  }
+
   return (
     <div className="min-h-screen bg-[#f0f5f3] flex flex-col items-center py-4 px-3 sm:px-4 selection:bg-emerald-200">
       {/* Container simulating smartphone/counter view */}
@@ -132,7 +240,7 @@ export default function App() {
         <Header
           onOpenSettings={() => setIsSettingsOpen(true)}
           onReset={handleResetAmount}
-          onExit={handleExitOrFullReset}
+          onExit={handleLogout}
           language={config.language}
           onToggleLanguage={handleToggleLanguage}
         />
@@ -142,6 +250,7 @@ export default function App() {
           config={config}
           finalAmount={finalAmount}
           baseAmount={baseAmount}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
 
         {/* Bill / Balance Amount & Quick Surcharges Section */}
@@ -205,8 +314,8 @@ export default function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         config={config}
-        onSave={(newCfg) => setConfig(newCfg)}
-        onResetDefaults={() => setConfig(DEFAULT_CONFIG)}
+        onSave={handleSaveConfig}
+        onResetDefaults={handleResetDefaults}
       />
 
       {/* Share Modal */}

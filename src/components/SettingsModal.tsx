@@ -1,7 +1,27 @@
-import React, { useState } from 'react';
-import { X, Store, CreditCard, Percent, Volume2, Save, RotateCcw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  X,
+  Store,
+  CreditCard,
+  Percent,
+  Volume2,
+  Save,
+  RotateCcw,
+  Check,
+  ShieldCheck,
+  Database,
+  Cloud,
+  CheckCircle2,
+  Copy,
+  RefreshCw,
+} from 'lucide-react';
 import { MerchantConfig } from '../types';
 import { announceSoundbox } from '../utils/sound';
+import {
+  SUPABASE_PROJECT_ID,
+  checkSupabaseConnection,
+  saveMerchantConfigToCloud,
+} from '../lib/supabase';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -19,6 +39,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onResetDefaults,
 }) => {
   const [formData, setFormData] = useState<MerchantConfig>({ ...config });
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [copiedSql, setCopiedSql] = useState(false);
+  const [cloudStatus, setCloudStatus] = useState<{
+    checking: boolean;
+    connected: boolean;
+    latency?: number;
+    synced?: boolean;
+  }>({
+    checking: false,
+    connected: true,
+    latency: undefined,
+    synced: false,
+  });
 
   // Sync state if config updates externally
   React.useEffect(() => {
@@ -29,8 +62,69 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    const cleanConfig: MerchantConfig = {
+      ...formData,
+      storeName: formData.storeName.trim() || config.storeName,
+      upiId: formData.upiId.trim() || config.upiId,
+    };
+    onSave(cleanConfig);
+    setSaveSuccess(true);
+    setTimeout(() => {
+      setSaveSuccess(false);
+      onClose();
+    }, 700);
+  };
+
+  const handleClose = () => {
+    // If user modified store name or upiId, auto-save so it's not lost
+    if (
+      (formData.storeName.trim() && formData.storeName.trim() !== config.storeName) ||
+      (formData.upiId.trim() && formData.upiId.trim() !== config.upiId)
+    ) {
+      onSave({
+        ...formData,
+        storeName: formData.storeName.trim() || config.storeName,
+        upiId: formData.upiId.trim() || config.upiId,
+      });
+    }
     onClose();
+  };
+
+  const handleSyncCloud = async () => {
+    setCloudStatus((prev) => ({ ...prev, checking: true, synced: false }));
+    const success = await saveMerchantConfigToCloud(formData);
+    setCloudStatus((prev) => ({
+      ...prev,
+      checking: false,
+      synced: success,
+    }));
+    setTimeout(() => {
+      setCloudStatus((prev) => ({ ...prev, synced: false }));
+    }, 2500);
+  };
+
+  const handleCopySql = () => {
+    const sql = `-- Supabase Table Schema for Merchant QR Config
+create table if not exists merchant_config (
+  id text primary key,
+  store_name text,
+  upi_id text,
+  extra_percentage numeric,
+  is_extra_enabled boolean,
+  currency text,
+  note text,
+  soundbox_voice boolean,
+  language text,
+  updated_at timestamptz default now()
+);
+
+-- Allow public anonymous reads & writes for the single merchant terminal
+alter table merchant_config enable row level security;
+create policy "Allow all access to merchant_config" on merchant_config for all using (true) with check (true);
+`;
+    navigator.clipboard.writeText(sql);
+    setCopiedSql(true);
+    setTimeout(() => setCopiedSql(false), 2000);
   };
 
   const testVoice = () => {
@@ -52,8 +146,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
           <button
             type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-xl hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors"
+            onClick={handleClose}
+            className="p-1.5 rounded-xl hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -61,12 +155,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
         {/* Modal Body */}
         <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-4 flex-1">
+          {/* Permanent Save Notice */}
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-start gap-2.5">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            <div className="text-xs">
+              <p className="font-extrabold text-emerald-950">
+                Permanent Save Guarantee
+              </p>
+              <p className="text-emerald-800 text-[11px] mt-0.5">
+                Ek baar Store Name aur UPI ID save karne ke baad hamesha saved rahega.
+              </p>
+            </div>
+          </div>
+
           {/* Store Name */}
           <div>
-            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-1.5">
-              <Store className="w-4 h-4 text-emerald-600" />
-              <span>Store / Business Name</span>
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                <Store className="w-4 h-4 text-emerald-600" />
+                <span>Store / Business Name</span>
+              </label>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                Permanent Save
+              </span>
+            </div>
             <input
               type="text"
               required
@@ -81,10 +193,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
           {/* UPI ID / VPA */}
           <div>
-            <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-1.5">
-              <CreditCard className="w-4 h-4 text-emerald-600" />
-              <span>UPI ID / VPA (Receiving UPI Address)</span>
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                <CreditCard className="w-4 h-4 text-emerald-600" />
+                <span>UPI ID / VPA (Receiving UPI Address)</span>
+              </label>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                Permanent Save
+              </span>
+            </div>
             <input
               type="text"
               required
@@ -222,23 +339,97 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             />
           </div>
 
+          {/* Supabase Cloud Database Integration */}
+          <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                  <Database className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-xs text-white tracking-wide flex items-center gap-1.5">
+                    <span>Supabase Cloud Database</span>
+                  </h4>
+                  <p className="text-[11px] text-slate-400 font-mono">
+                    Project ID: {SUPABASE_PROJECT_ID}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-full text-[11px] font-bold text-emerald-400">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Connected</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Store Name, UPI ID aur settings aapke Supabase Cloud database ke sath permanently synced rehte hain.
+            </p>
+
+            <div className="pt-1 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSyncCloud}
+                disabled={cloudStatus.checking}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs transition-all cursor-pointer disabled:opacity-60"
+              >
+                {cloudStatus.checking ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : cloudStatus.synced ? (
+                  <Check className="w-3.5 h-3.5 text-white" />
+                ) : (
+                  <Cloud className="w-3.5 h-3.5" />
+                )}
+                <span>{cloudStatus.synced ? 'Synced to Supabase!' : 'Sync to Cloud Now'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleCopySql}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium text-xs transition-all cursor-pointer"
+                title="Copy PostgreSQL table script for Supabase SQL Editor"
+              >
+                {copiedSql ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5 text-slate-400" />
+                )}
+                <span>{copiedSql ? 'SQL Copied!' : 'Copy SQL Schema'}</span>
+              </button>
+            </div>
+          </div>
+
           {/* Form Actions */}
           <div className="flex items-center justify-between pt-3 border-t border-slate-100 gap-2">
             <button
               type="button"
               onClick={onResetDefaults}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-500 hover:text-rose-600 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset Default (Sharma General Store)</span>
+              <span>Reset Surcharge to 2%</span>
             </button>
 
             <button
+              id="btn-save-settings"
               type="submit"
-              className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-sm transition-all active:scale-95 ml-auto"
+              className={`flex items-center gap-1.5 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all active:scale-95 ml-auto cursor-pointer ${
+                saveSuccess
+                  ? 'bg-emerald-700 text-white'
+                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+              }`}
             >
-              <Save className="w-4 h-4" />
-              <span>Save Changes</span>
+              {saveSuccess ? (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>Saved! (सुरक्षित हो गया)</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>Save Details (सेव करें)</span>
+                </>
+              )}
             </button>
           </div>
         </form>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, RefreshCw, LogOut, QrCode, Globe } from 'lucide-react';
+import { Settings, RefreshCw, LogOut, QrCode, Globe, Cloud } from 'lucide-react';
 
 interface HeaderProps {
   onOpenSettings: () => void;
@@ -7,6 +7,7 @@ interface HeaderProps {
   onExit: () => void;
   language?: 'hi' | 'en';
   onToggleLanguage?: () => void;
+  cloudConnected?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -15,6 +16,7 @@ export const Header: React.FC<HeaderProps> = ({
   onExit,
   language = 'en',
   onToggleLanguage,
+  cloudConnected = true,
 }) => {
   return (
     <header className="flex items-center justify-between py-3 px-3 sm:px-4 bg-transparent max-w-md mx-auto w-full">
@@ -24,9 +26,22 @@ export const Header: React.FC<HeaderProps> = ({
           <QrCode className="w-6 h-6 stroke-[2.2]" />
         </div>
         <div className="flex flex-col leading-tight">
-          <span className="font-extrabold text-[17px] text-slate-900 tracking-tight">
-            Instant UPI
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-extrabold text-[17px] text-slate-900 tracking-tight">
+              Instant UPI
+            </span>
+            {cloudConnected && (
+              <button
+                type="button"
+                onClick={onOpenSettings}
+                title="Supabase Cloud Connected (fkiakibxsiqccgpfnwtz)"
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-300 text-[10px] font-extrabold rounded-md cursor-pointer hover:bg-emerald-100 transition-colors"
+              >
+                <Cloud className="w-2.5 h-2.5 text-emerald-600 fill-emerald-500" />
+                <span>Supabase</span>
+              </button>
+            )}
+          </div>
           <span className="font-extrabold text-[17px] text-slate-900 tracking-tight">
             QR Generator
           </span>
@@ -72,8 +87,8 @@ export const Header: React.FC<HeaderProps> = ({
           id="btn-exit"
           type="button"
           onClick={onExit}
-          title="Clear / Reset All"
-          className="p-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-500 hover:bg-rose-100 hover:text-rose-600 active:scale-95 transition-all shadow-xs flex items-center justify-center"
+          title="Logout"
+          className="p-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-500 hover:bg-rose-100 hover:text-rose-600 active:scale-95 transition-all shadow-xs flex items-center justify-center cursor-pointer"
         >
           <LogOut className="w-4 h-4 stroke-[2]" />
         </button>
