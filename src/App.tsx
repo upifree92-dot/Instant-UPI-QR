@@ -17,7 +17,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { MerchantConfig, UserRole } from './types';
 import { announceSoundbox } from './utils/sound';
 import { buildUpiPayUrl } from './utils/upi';
-import { Volume2, CheckCircle2, Share2, ShieldCheck, ArrowLeft, User, Cloud, Edit3, Check, X } from 'lucide-react';
+import { Volume2, CheckCircle2, Share2, ShieldCheck, ArrowLeft, User, Edit3, Check, X } from 'lucide-react';
 import { fetchMerchantConfigFromCloud, saveMerchantConfigToCloud } from './lib/supabase';
 import { getUserByEmail, getUserValidityInfo, updateUserAccountName } from './lib/userStore';
 
@@ -343,6 +343,7 @@ export default function App() {
         onSaveConfig={handleSaveConfig}
         onSwitchToTerminal={() => setCurrentView('terminal')}
         onLogout={handleLogout}
+        initialTab="roles"
       />
     );
   }
@@ -375,12 +376,11 @@ export default function App() {
           onReset={handleResetAmount}
           onExit={handleLogout}
           language={config.language}
-          onToggleLanguage={handleToggleLanguage}
           isAdmin={userRole === 'admin'}
           onSwitchToAdmin={userRole === 'admin' ? () => setCurrentView('admin') : undefined}
         />
 
-        {/* Customer Account & Supabase Cloud Connection Status Card */}
+        {/* Customer Account Status Card */}
         {userRole !== 'admin' && (
           <div className="bg-white/95 rounded-2xl p-3 border border-emerald-200 shadow-2xs space-y-2">
             <div className="flex items-center justify-between gap-2">
@@ -390,7 +390,7 @@ export default function App() {
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-extrabold text-slate-800 text-xs truncate max-w-[150px] sm:max-w-[200px]">
+                    <span className="font-extrabold text-slate-800 text-xs truncate max-w-[170px] sm:max-w-[220px]">
                       {currentUser?.businessName || currentUser?.name || config.storeName}
                     </span>
 
@@ -433,18 +433,6 @@ export default function App() {
                   </div>
                 </div>
               </div>
-
-              {/* Supabase Connect Button - Opens Settings */}
-              <button
-                type="button"
-                onClick={() => setIsSettingsOpen(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-[11px] font-bold shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
-                title="Supabase Cloud Database Connected - Open Settings to view details"
-              >
-                <Cloud className="w-3.5 h-3.5 text-emerald-600 fill-emerald-500 shrink-0" />
-                <span className="hidden xs:inline">Supabase</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              </button>
             </div>
 
             {/* Inline Rename Box with instant automatic saving */}

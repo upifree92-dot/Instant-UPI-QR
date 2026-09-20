@@ -54,7 +54,7 @@ export function getUserValidityInfo(user: RegisteredUser): {
 } {
   if (
     user.role === 'admin' ||
-    user.email.toLowerCase() === 'demo11' ||
+    user.email.toLowerCase() === 'kgfilewala@gmail.com' ||
     user.validityPlan === 'lifetime'
   ) {
     return {
@@ -110,16 +110,31 @@ oneMonthOut.setMonth(oneMonthOut.getMonth() + 1);
 
 const DEFAULT_USERS: RegisteredUser[] = [
   {
-    id: 'user_admin_demo',
+    id: 'admin_kgfilewala',
     name: 'Super Admin',
-    email: 'demo11',
-    password: 'demo11',
+    email: 'kgfilewala@gmail.com',
+    password: 'bbbb@9090',
     role: 'admin',
     status: 'active',
     validityPlan: 'lifetime',
     validUntil: new Date(Date.now() + 86400000 * 3650).toISOString(),
     validFrom: new Date(Date.now() - 86400000 * 30).toISOString(),
     registeredAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+    isNotificationRead: true,
+  },
+  {
+    id: 'user_demo9090',
+    name: 'Demo User',
+    email: 'demo9090',
+    password: 'demo9090',
+    phone: '9090909090',
+    businessName: 'Demo Store',
+    role: 'customer',
+    status: 'active',
+    validityPlan: 'lifetime',
+    validUntil: new Date(Date.now() + 86400000 * 3650).toISOString(),
+    validFrom: new Date(Date.now() - 86400000 * 30).toISOString(),
+    registeredAt: new Date().toISOString(),
     isNotificationRead: true,
   },
   {
@@ -145,14 +160,49 @@ export function getRegisteredUsers(): RegisteredUser[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Filter out any legacy demo merchant accounts to keep admin clean
-        const cleaned = parsed.filter(
-          (u) => u.id !== 'user_merchant_demo' && u.email !== 'demo@gmail.com'
+        // Filter out any legacy demo merchant accounts and old demo11 admin
+        let cleaned = parsed.filter(
+          (u) =>
+            u.id !== 'user_merchant_demo' &&
+            u.id !== 'admin_demo11' &&
+            u.id !== 'user_admin_demo' &&
+            u.email !== 'demo@gmail.com' &&
+            u.email.toLowerCase() !== 'demo11'
         );
-        // Ensure admin user exists
-        if (!cleaned.some((u) => u.email === 'demo11')) {
+        // Ensure new admin user exists and has current password
+        const adminIdx = cleaned.findIndex(
+          (u) => u.email.toLowerCase() === 'kgfilewala@gmail.com'
+        );
+        if (adminIdx === -1) {
           cleaned.unshift(DEFAULT_USERS[0]);
+        } else {
+          cleaned[adminIdx] = {
+            ...cleaned[adminIdx],
+            role: 'admin',
+            status: 'active',
+            password: 'bbbb@9090',
+          };
         }
+
+        // Ensure demo9090 user exists with password demo9090
+        const demoIdx = cleaned.findIndex(
+          (u) =>
+            u.email.toLowerCase() === 'demo9090' ||
+            u.id === 'user_demo9090'
+        );
+        if (demoIdx === -1) {
+          const demoUser = DEFAULT_USERS.find((u) => u.email === 'demo9090');
+          if (demoUser) cleaned.push(demoUser);
+        } else {
+          cleaned[demoIdx] = {
+            ...cleaned[demoIdx],
+            email: 'demo9090',
+            password: 'demo9090',
+            status: 'active',
+            validityPlan: 'lifetime',
+          };
+        }
+
         return cleaned;
       }
     }
@@ -285,15 +335,15 @@ export function authenticateUser(
   const cleanPass = pass.trim();
 
   // 1. Direct super-admin check
-  if (cleanId === 'demo11' && cleanPass === 'demo11') {
+  if (cleanId === 'kgfilewala@gmail.com' && cleanPass === 'bbbb@9090') {
     return {
       success: true,
       isAdmin: true,
       user: {
-        id: 'admin_demo11',
+        id: 'admin_kgfilewala',
         name: 'Super Admin',
-        email: 'demo11',
-        password: 'demo11',
+        email: 'kgfilewala@gmail.com',
+        password: 'bbbb@9090',
         role: 'admin',
         status: 'active',
         validityPlan: 'lifetime',
@@ -305,11 +355,40 @@ export function authenticateUser(
     };
   }
 
-  // 2. Query registered users
+  // 2. Direct demo9090 customer check
+  if ((cleanId === 'demo9090' || cleanId === 'demo9090@gmail.com') && cleanPass === 'demo9090') {
+    const allUsers = getRegisteredUsers();
+    const demoFound = allUsers.find((u) => u.email.toLowerCase() === 'demo9090') || {
+      id: 'user_demo9090',
+      name: 'Demo User',
+      email: 'demo9090',
+      password: 'demo9090',
+      phone: '9090909090',
+      businessName: 'Demo Store',
+      role: 'customer' as const,
+      status: 'active' as const,
+      validityPlan: 'lifetime' as const,
+      validUntil: new Date(Date.now() + 86400000 * 3650).toISOString(),
+      validFrom: new Date(Date.now() - 86400000 * 30).toISOString(),
+      registeredAt: new Date().toISOString(),
+      isNotificationRead: true,
+    };
+    return {
+      success: true,
+      isAdmin: false,
+      user: demoFound,
+    };
+  }
+
+  // 3. Query registered users
   const users = getRegisteredUsers();
   const matched = users.find(
     (u) =>
       u.email.toLowerCase() === cleanId ||
+      (cleanId === 'demo9090' && u.email.toLowerCase() === 'demo9090') ||
+      (cleanId === 'demo9090@gmail.com' && u.email.toLowerCase() === 'demo9090') ||
+      u.email.toLowerCase() === `${cleanId}@gmail.com` ||
+      (cleanId.endsWith('@gmail.com') && u.email.toLowerCase() === cleanId.replace('@gmail.com', '')) ||
       (u.phone && u.phone.toLowerCase() === cleanId)
   );
 
@@ -355,7 +434,9 @@ export function authenticateUser(
   return {
     success: true,
     user: matched,
-    isAdmin: matched.role === 'admin' || matched.email.toLowerCase() === 'demo11',
+    isAdmin:
+      matched.role === 'admin' ||
+      matched.email.toLowerCase() === 'kgfilewala@gmail.com',
   };
 }
 
@@ -445,5 +526,11 @@ export function markAllNotificationsRead(): void {
 
 export function getUnreadRegistrationCount(): number {
   const users = getRegisteredUsers();
-  return users.filter((u) => !u.isNotificationRead && u.email !== 'demo11').length;
+  return users.filter(
+    (u) =>
+      !u.isNotificationRead &&
+      u.email.toLowerCase() !== 'kgfilewala@gmail.com' &&
+      u.email.toLowerCase() !== 'demo11' &&
+      u.role !== 'admin'
+  ).length;
 }

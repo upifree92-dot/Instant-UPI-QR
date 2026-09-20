@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Lock,
   Mail,
@@ -14,11 +14,13 @@ import {
   Phone,
   Store,
   CheckCircle2,
-  Bell,
-  Calendar,
+  Check,
 } from 'lucide-react';
-import { UserRole, ValidityPlan } from '../types';
-import { authenticateUser, registerCustomer, VALIDITY_PLANS } from '../lib/userStore';
+import { UserRole } from '../types';
+import { authenticateUser, registerCustomer } from '../lib/userStore';
+
+const SAVED_CREDENTIALS_KEY = 'upi_saved_login_credentials_v1';
+const REMEMBER_PREF_KEY = 'upi_remember_login_pref_v1';
 
 interface LoginPageProps {
   onLoginSuccess: (user: string, role: UserRole) => void;
@@ -27,10 +29,65 @@ interface LoginPageProps {
 export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [mode, setMode] = useState<'login' | 'register'>('login');
 
-  // Login form state
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  // Remember / Save credentials state
+  const [saveCredentials, setSaveCredentials] = useState<boolean>(() => {
+    try {
+      const pref = localStorage.getItem(REMEMBER_PREF_KEY);
+      return pref === null ? true : pref === 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  const [hasSavedCredentials, setHasSavedCredentials] = useState<boolean>(false);
+
+  // Login form state - initialized from saved credentials if present
+  const [username, setUsername] = useState(() => {
+    try {
+      const raw = localStorage.getItem(SAVED_CREDENTIALS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return parsed.username || '';
+      }
+    } catch {}
+    return '';
+  });
+
+  const [password, setPassword] = useState(() => {
+    try {
+      const raw = localStorage.getItem(SAVED_CREDENTIALS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return parsed.password || '';
+      }
+    } catch {}
+    return '';
+  });
+
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SAVED_CREDENTIALS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.username && parsed.password) {
+          setHasSavedCredentials(true);
+        }
+      }
+    } catch {}
+  }, []);
+
+  const handleClearSavedCredentials = () => {
+    try {
+      localStorage.removeItem(SAVED_CREDENTIALS_KEY);
+      setUsername('');
+      setPassword('');
+      setHasSavedCredentials(false);
+      setSuccessMsg('Saved credentials cleared from this device.');
+      setTimeout(() => setSuccessMsg(null), 2500);
+    } catch {}
+  };
 
   // Register form state
   const [regName, setRegName] = useState('');
@@ -38,7 +95,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [regPassword, setRegPassword] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regStore, setRegStore] = useState('');
-  const [regValidityPlan, setRegValidityPlan] = useState<ValidityPlan>('1_month');
   const [showRegPassword, setShowRegPassword] = useState(false);
 
   // UI status
@@ -66,6 +122,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       setIsLoading(false);
 
       if (auth.success && auth.user) {
+        // Save Name and Password if option is checked
+        if (saveCredentials) {
+          try {
+            localStorage.setItem(
+              SAVED_CREDENTIALS_KEY,
+              JSON.stringify({ username: trimmedUser, password: trimmedPass })
+            );
+            localStorage.setItem(REMEMBER_PREF_KEY, 'true');
+          } catch {}
+        } else {
+          try {
+            localStorage.removeItem(SAVED_CREDENTIALS_KEY);
+            localStorage.setItem(REMEMBER_PREF_KEY, 'false');
+          } catch {}
+        }
+
         onLoginSuccess(auth.user.email, auth.isAdmin ? 'admin' : auth.user.role);
       } else {
         setError(auth.error || 'Invalid username or password.');
@@ -101,8 +173,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         phone: regPhone,
         businessName: regStore,
         role: 'customer',
-        status: 'pending', // requires admin validation
-        validityPlan: regValidityPlan,
+        status: 'active',
+        validityPlan: 'lifetime',
       });
 
       setIsLoading(false);
@@ -112,14 +184,24 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         return;
       }
 
-      const planItem = VALIDITY_PLANS.find((p) => p.id === regValidityPlan);
       setSuccessMsg(
-        `Registration submitted for ${regName} (${planItem?.label} Plan)! A notification was sent to Admin Panel. Once the Admin validates your account, you will be able to log in.`
+        `Account registered successfully for ${regName}! You can now sign in.`
       );
 
       // Prepopulate login form and switch to login tab
       setUsername(regEmail.trim());
       setPassword(regPassword);
+
+      if (saveCredentials) {
+        try {
+          localStorage.setItem(
+            SAVED_CREDENTIALS_KEY,
+            JSON.stringify({ username: regEmail.trim(), password: regPassword })
+          );
+          setHasSavedCredentials(true);
+        } catch {}
+      }
+
       setMode('login');
 
       // Clear reg form
@@ -128,7 +210,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       setRegPassword('');
       setRegPhone('');
       setRegStore('');
-      setRegValidityPlan('1_month');
     }, 300);
   };
 
@@ -267,6 +348,44 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 </div>
               </div>
 
+              {/* Save Name & Password (Remember Login) Option */}
+              <div className="flex items-center justify-between pt-0.5 pb-1">
+                <label
+                  htmlFor="chk-save-credentials"
+                  className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none hover:text-emerald-700 transition-colors"
+                >
+                  <input
+                    id="chk-save-credentials"
+                    type="checkbox"
+                    checked={saveCredentials}
+                    onChange={(e) => {
+                      const val = e.target.checked;
+                      setSaveCredentials(val);
+                      try {
+                        localStorage.setItem(REMEMBER_PREF_KEY, val ? 'true' : 'false');
+                        if (!val) {
+                          localStorage.removeItem(SAVED_CREDENTIALS_KEY);
+                          setHasSavedCredentials(false);
+                        }
+                      } catch {}
+                    }}
+                    className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
+                  />
+                  <span>Save Name & Password (Auto-Fill)</span>
+                </label>
+
+                {hasSavedCredentials && (
+                  <button
+                    type="button"
+                    onClick={handleClearSavedCredentials}
+                    className="text-[11px] font-bold text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                    title="Clear saved login credentials from this device"
+                  >
+                    Clear Saved
+                  </button>
+                )}
+              </div>
+
               {/* Submit Button */}
               <button
                 id="btn-login-submit"
@@ -277,7 +396,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 <span>
                   {isLoading
                     ? 'Verifying credentials...'
-                    : username.toLowerCase() === 'demo11'
+                    : username.toLowerCase().trim() === 'kgfilewala@gmail.com'
                     ? 'Sign In to Admin Panel'
                     : 'Sign In'}
                 </span>
@@ -289,13 +408,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           {/* REGISTER FORM */}
           {mode === 'register' && (
             <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
-              <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-2.5 text-xs text-emerald-900 font-medium flex items-center gap-2">
-                <Bell className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>
-                  Registration details will automatically notify the Admin Panel for validation.
-                </span>
-              </div>
-
               {/* Name */}
               <div>
                 <label
@@ -426,40 +538,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 </div>
               </div>
 
-              {/* Validity Plan Option */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1 flex items-center justify-between">
-                  <span>Validity Duration</span>
-                  <span className="text-[10px] text-emerald-700 font-bold normal-case">
-                    Admin validated
-                  </span>
+              {/* Save Name & Password on this device */}
+              <div className="pt-0.5 pb-1">
+                <label
+                  htmlFor="chk-reg-save-credentials"
+                  className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none hover:text-emerald-700 transition-colors"
+                >
+                  <input
+                    id="chk-reg-save-credentials"
+                    type="checkbox"
+                    checked={saveCredentials}
+                    onChange={(e) => setSaveCredentials(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
+                  />
+                  <span>Save Name & Password on this device</span>
                 </label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {VALIDITY_PLANS.filter((p) => p.id !== 'lifetime').map((plan) => {
-                    const isSelected = regValidityPlan === plan.id;
-                    return (
-                      <button
-                        key={plan.id}
-                        type="button"
-                        onClick={() => setRegValidityPlan(plan.id)}
-                        className={`py-1.5 px-1 rounded-xl text-xs font-extrabold text-center border transition-all cursor-pointer shadow-2xs ${
-                          isSelected
-                            ? 'bg-emerald-600 text-white border-emerald-600 ring-2 ring-emerald-300'
-                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-                        }`}
-                      >
-                        <div className="text-[11px] leading-tight">{plan.label}</div>
-                        <div
-                          className={`text-[9px] font-medium ${
-                            isSelected ? 'text-emerald-100' : 'text-slate-400'
-                          }`}
-                        >
-                          {plan.days}d
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
               </div>
 
               {/* Submit Register */}

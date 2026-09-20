@@ -62,6 +62,7 @@ interface AdminPanelProps {
   onSaveConfig: (newConfig: MerchantConfig) => void;
   onSwitchToTerminal: () => void;
   onLogout: () => void;
+  initialTab?: 'roles' | 'config' | 'database' | 'presets';
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -69,9 +70,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onSaveConfig,
   onSwitchToTerminal,
   onLogout,
+  initialTab = 'roles',
 }) => {
   const [formData, setFormData] = useState<MerchantConfig>({ ...config });
-  const [activeTab, setActiveTab] = useState<'config' | 'database' | 'presets' | 'roles'>('config');
+  const [activeTab, setActiveTab] = useState<'roles' | 'config' | 'database' | 'presets'>(
+    initialTab || 'roles'
+  );
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
   const [pingLatency, setPingLatency] = useState<number | null>(null);
@@ -310,9 +314,14 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
     }, 1300);
   };
 
+  const isCustomerUser = (u: RegisteredUser) =>
+    u.role !== 'admin' &&
+    u.email.toLowerCase() !== 'kgfilewala@gmail.com' &&
+    u.email.toLowerCase() !== 'demo11';
+
   // Filtered customer list
   const filteredUsers = usersList.filter((u) => {
-    if (u.email === 'demo11') return false; // Admin kept separate
+    if (!isCustomerUser(u)) return false; // Admin kept separate
 
     if (userStatusFilter === 'expired') {
       const v = getUserValidityInfo(u);
@@ -406,13 +415,13 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                   </div>
 
                   <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                    {usersList.filter((u) => u.email !== 'demo11').length === 0 ? (
+                    {usersList.filter(isCustomerUser).length === 0 ? (
                       <div className="text-center py-4 text-xs text-slate-400">
                         No customer registrations yet.
                       </div>
                     ) : (
                       usersList
-                        .filter((u) => u.email !== 'demo11')
+                        .filter(isCustomerUser)
                         .slice(0, 5)
                         .map((u) => (
                           <div
@@ -571,6 +580,24 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
         <div className="flex border-b border-slate-200 bg-white rounded-xl px-2 py-1.5 shadow-2xs gap-1">
           <button
             type="button"
+            onClick={() => setActiveTab('roles')}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'roles'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Customers & Roles</span>
+            {unreadNotifications > 0 && (
+              <span className="bg-rose-500 text-white text-[10px] font-extrabold px-1.5 py-0.2 rounded-full ml-0.5 animate-pulse">
+                {unreadNotifications}
+              </span>
+            )}
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('config')}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'config'
@@ -606,24 +633,6 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
           >
             <DollarSign className="w-3.5 h-3.5" />
             <span>Preset Chips</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('roles')}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'roles'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>Customers & Roles</span>
-            {unreadNotifications > 0 && (
-              <span className="bg-rose-500 text-white text-[10px] font-extrabold px-1.5 py-0.2 rounded-full ml-0.5 animate-pulse">
-                {unreadNotifications}
-              </span>
-            )}
           </button>
         </div>
 
@@ -1032,7 +1041,7 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
             )}
 
             {/* Pending Validation Alert Banner */}
-            {usersList.some((u) => u.email !== 'demo11' && u.status === 'pending') && (
+            {usersList.some((u) => isCustomerUser(u) && u.status === 'pending') && (
               <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 space-y-2">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2 text-amber-900 text-xs font-semibold">
@@ -1059,7 +1068,7 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                         type="button"
                         onClick={() => {
                           usersList
-                            .filter((u) => u.email !== 'demo11' && u.status === 'pending')
+                            .filter((u) => isCustomerUser(u) && u.status === 'pending')
                             .forEach((u) => {
                               updateUserStatus(u.id, 'active', pKey);
                             });
@@ -1086,7 +1095,7 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-200">
                 <div className="text-[11px] font-bold text-slate-500 uppercase">Total Customers</div>
                 <div className="text-lg font-black text-slate-900 mt-0.5">
-                  {usersList.filter((u) => u.email !== 'demo11').length}
+                  {usersList.filter(isCustomerUser).length}
                 </div>
               </div>
               <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200">
@@ -1095,7 +1104,7 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                   {
                     usersList.filter(
                       (u) =>
-                        u.email !== 'demo11' &&
+                        isCustomerUser(u) &&
                         u.status === 'active' &&
                         !getUserValidityInfo(u).isExpired
                     ).length
@@ -1108,7 +1117,7 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                   {
                     usersList.filter(
                       (u) =>
-                        u.email !== 'demo11' &&
+                        isCustomerUser(u) &&
                         getUserValidityInfo(u).isExpired
                     ).length
                   }
@@ -1117,7 +1126,7 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
               <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200">
                 <div className="text-[11px] font-bold text-amber-800 uppercase">Pending Approval</div>
                 <div className="text-lg font-black text-amber-700 mt-0.5">
-                  {usersList.filter((u) => u.email !== 'demo11' && u.status === 'pending').length}
+                  {usersList.filter((u) => isCustomerUser(u) && u.status === 'pending').length}
                 </div>
               </div>
             </div>

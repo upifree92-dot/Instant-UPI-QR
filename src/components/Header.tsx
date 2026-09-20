@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, RefreshCw, LogOut, QrCode, Globe, Cloud, ShieldCheck } from 'lucide-react';
+import { Settings, RefreshCw, LogOut, QrCode, ShieldCheck } from 'lucide-react';
 
 interface HeaderProps {
   onOpenSettings: () => void;
@@ -18,7 +18,7 @@ export const Header: React.FC<HeaderProps> = ({
   onExit,
   language = 'en',
   onToggleLanguage,
-  cloudConnected = true,
+  cloudConnected = false,
   isAdmin = false,
   onSwitchToAdmin,
 }) => {
@@ -30,22 +30,9 @@ export const Header: React.FC<HeaderProps> = ({
           <QrCode className="w-6 h-6 stroke-[2.2]" />
         </div>
         <div className="flex flex-col leading-tight">
-          <div className="flex items-center gap-1.5">
-            <span className="font-extrabold text-[17px] text-slate-900 tracking-tight">
-              Instant UPI
-            </span>
-            {cloudConnected && (
-              <button
-                type="button"
-                onClick={onOpenSettings}
-                title="Supabase Cloud Connected (fkiakibxsiqccgpfnwtz)"
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-800 border border-emerald-300 text-[10px] font-extrabold rounded-md cursor-pointer hover:bg-emerald-100 transition-colors"
-              >
-                <Cloud className="w-2.5 h-2.5 text-emerald-600 fill-emerald-500" />
-                <span>Supabase</span>
-              </button>
-            )}
-          </div>
+          <span className="font-extrabold text-[17px] text-slate-900 tracking-tight">
+            Instant UPI
+          </span>
           <span className="font-extrabold text-[17px] text-slate-900 tracking-tight">
             QR Generator
           </span>
@@ -64,19 +51,6 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <ShieldCheck className="w-3.5 h-3.5 stroke-[2.4]" />
             <span>Admin</span>
-          </button>
-        )}
-
-        {onToggleLanguage && (
-          <button
-            id="btn-toggle-lang"
-            type="button"
-            onClick={onToggleLanguage}
-            title={language === 'en' ? 'Language: English' : 'Language: Hindi'}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs hover:bg-slate-50 active:scale-95 transition-all shadow-xs cursor-pointer"
-          >
-            <Globe className="w-3.5 h-3.5 text-emerald-600 stroke-[2.2]" />
-            <span>{language === 'en' ? 'EN' : 'HI'}</span>
           </button>
         )}
 
