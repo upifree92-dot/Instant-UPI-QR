@@ -152,12 +152,53 @@ async function startServer() {
 
   app.use(express.json({ limit: '10mb' }));
 
+  // SSE client pool for super automatic real-time push
+  const sseClients: Set<express.Response> = new Set();
+
+  function broadcastSse(event: string, payload: any) {
+    const data = JSON.stringify(payload);
+    for (const client of Array.from(sseClients)) {
+      try {
+        client.write(`event: ${event}\ndata: ${data}\n\n`);
+      } catch {
+        sseClients.delete(client);
+      }
+    }
+  }
+
+  // Keep SSE alive with periodic heartbeat
+  setInterval(() => {
+    for (const client of Array.from(sseClients)) {
+      try {
+        client.write(`: heartbeat ${Date.now()}\n\n`);
+      } catch {
+        sseClients.delete(client);
+      }
+    }
+  }, 15000);
+
   // ==========================================
   // API ROUTES
   // ==========================================
 
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', time: new Date().toISOString() });
+  });
+
+  // Real-time Event Stream (Server-Sent Events)
+  app.get('/api/users/stream', (req, res) => {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    res.write(`event: connected\ndata: ${JSON.stringify({ time: Date.now(), totalUsers: loadUsers().length })}\n\n`);
+    sseClients.add(res);
+
+    req.on('close', () => {
+      sseClients.delete(res);
+    });
   });
 
   // Get all registered users (used by Admin Panel and Client Sync)
@@ -225,6 +266,8 @@ async function startServer() {
       saveUsers(users);
 
       console.log(`[API] New customer registered: ${cleanEmail} (Status: ${newUser.status})`);
+      // Super automatic instant push to all connected clients & admin panels
+      broadcastSse('user_registered', { user: newUser, users });
       return res.json({ success: true, user: newUser });
     } catch (err: any) {
       console.error('[API] Register error:', err);
@@ -252,6 +295,8 @@ async function startServer() {
 
       saveUsers(users);
       console.log(`[API] User ${users[idx].email} status updated to ${status}`);
+      // Super automatic instant push to all connected clients & admin panels
+      broadcastSse('user_updated', { user: users[idx], users });
       return res.json({ success: true, user: users[idx] });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
@@ -278,6 +323,8 @@ async function startServer() {
 
       users[idx].password = newPassword.trim();
       saveUsers(users);
+      // Super automatic push
+      broadcastSse('user_updated', { user: users[idx], users });
       return res.json({ success: true, user: users[idx] });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
@@ -315,6 +362,8 @@ async function startServer() {
       saveUsers(filtered);
 
       console.log(`[API] User ${target.email} deleted permanently`);
+      // Super automatic push
+      broadcastSse('user_deleted', { id: target.id, email: target.email, users: filtered });
       return res.json({ success: true });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
@@ -340,15 +389,11 @@ async function startServer() {
             // New user registered on client, add to server!
             serverUsers.push(cu);
             changed = true;
-          } else {
-            // If client has newer status update
-            if (cu.status && cu.status !== serverUsers[existingIdx].status) {
-              // Priority: server authoritative, unless pending->active or changed
-            }
           }
         }
         if (changed) {
           saveUsers(serverUsers);
+          broadcastSse('users_synced', { users: serverUsers });
         }
       }
 

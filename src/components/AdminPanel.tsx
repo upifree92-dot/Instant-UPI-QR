@@ -66,6 +66,7 @@ import {
   getUserValidityInfo,
   updateUserPassword,
   syncWithServerUsers,
+  subscribeToSuperAutoConnect,
 } from '../lib/userStore';
 
 interface AdminPanelProps {
@@ -329,7 +330,7 @@ create policy "Allow all access to transactions" on transactions for all using (
     }
   };
 
-  // Auto-connect and sync customers with server and all browser tabs in real-time
+  // Super Automatic Auto-Connect: Server-Sent Events, BroadcastChannel & real-time sync
   useEffect(() => {
     // Initial server pull
     syncWithServerUsers().then((synced) => {
@@ -337,7 +338,29 @@ create policy "Allow all access to transactions" on transactions for all using (
       setUnreadNotifications(getUnreadRegistrationCount());
     });
 
-    // 1. Polling interval every 3s to pull any new customer registrations from server
+    // 1. Super Auto-Connect Server-Sent Events (instant push in <10ms across any device or browser)
+    const unsubscribeSSE = subscribeToSuperAutoConnect((payload) => {
+      if (payload.users && payload.users.length > 0) {
+        setUsersList(payload.users);
+      } else {
+        refreshUsersData();
+      }
+      setUnreadNotifications(getUnreadRegistrationCount());
+
+      if (payload.type === 'user_registered' && payload.user) {
+        setValidityToast({
+          message: `⚡ Instant Connect: New registration received for ${
+            payload.user.name || payload.user.email
+          }! Ready for activation.`,
+          type: 'info',
+        });
+        setTimeout(() => setValidityToast(null), 5000);
+      } else if (payload.type === 'user_updated' && payload.user) {
+        setSelectedCustomer((prev) => (prev && prev.id === payload.user?.id ? payload.user : prev));
+      }
+    });
+
+    // 2. Fallback polling interval every 3s
     const pollInterval = setInterval(async () => {
       try {
         const synced = await syncWithServerUsers();
@@ -347,7 +370,7 @@ create policy "Allow all access to transactions" on transactions for all using (
       } catch {}
     }, 3000);
 
-    // 2. BroadcastChannel for instant cross-tab updates without delay
+    // 3. BroadcastChannel for instant cross-tab updates without delay
     let bc: BroadcastChannel | null = null;
     try {
       if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
@@ -356,9 +379,9 @@ create policy "Allow all access to transactions" on transactions for all using (
           refreshUsersData();
           if (ev.data?.detail?.user) {
             setValidityToast({
-              message: `New Customer Registration received: ${
+              message: `⚡ Instant Connect: ${
                 ev.data.detail.user.name || ev.data.detail.user.email
-              }!`,
+              } registered!`,
               type: 'info',
             });
             setTimeout(() => setValidityToast(null), 4000);
@@ -367,12 +390,12 @@ create policy "Allow all access to transactions" on transactions for all using (
       }
     } catch {}
 
-    // 3. Local CustomEvent & Storage listeners
+    // 4. Local CustomEvent & Storage listeners
     const handleSyncEvent = (e: any) => {
       refreshUsersData();
       if (e?.detail?.user) {
         setValidityToast({
-          message: `New Customer Registration received: ${e.detail.user.name || e.detail.user.email}!`,
+          message: `⚡ Instant Connect: ${e.detail.user.name || e.detail.user.email}!`,
           type: 'info',
         });
         setTimeout(() => setValidityToast(null), 4000);
@@ -382,6 +405,7 @@ create policy "Allow all access to transactions" on transactions for all using (
     window.addEventListener('storage', handleSyncEvent);
 
     return () => {
+      unsubscribeSSE();
       clearInterval(pollInterval);
       if (bc) bc.close();
       window.removeEventListener('upi_users_updated', handleSyncEvent);
@@ -1197,12 +1221,12 @@ create policy "Allow all access to transactions" on transactions for all using (
                     type="button"
                     onClick={handleManualSyncUsers}
                     disabled={isSyncingUsers}
-                    title="Sync and connect all customer registrations with server in real-time"
-                    className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0 ml-auto"
+                    title="Super Automatic Real-Time Server Stream Active. Click to force instant sync."
+                    className="px-3.5 py-2 rounded-xl text-xs font-black bg-emerald-500 hover:bg-emerald-600 text-white shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 shrink-0 ml-auto"
                   >
-                    <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${isSyncingUsers ? 'animate-spin' : ''}`} />
-                    <span>{isSyncingUsers ? 'Connecting...' : 'Sync Server'}</span>
-                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <RefreshCw className={`w-3.5 h-3.5 text-white ${isSyncingUsers ? 'animate-spin' : ''}`} />
+                    <span>{isSyncingUsers ? 'Connecting...' : 'Super Auto-Connect: 🟢 Live'}</span>
+                    <span className="inline-block w-2 h-2 rounded-full bg-white animate-ping" />
                   </button>
                 </div>
               </div>

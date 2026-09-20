@@ -335,6 +335,100 @@ export async function syncWithServerUsers(): Promise<RegisteredUser[]> {
   return getRegisteredUsers();
 }
 
+// ==============================================================================
+// SUPER AUTOMATIC REAL-TIME AUTO CONNECT ENGINE (Server-Sent Events & Cross-Tab)
+// ==============================================================================
+type SuperSyncListener = (payload: { type: string; user?: RegisteredUser; users?: RegisteredUser[] }) => void;
+const listeners: Set<SuperSyncListener> = new Set();
+let globalEventSource: EventSource | null = null;
+let isConnecting = false;
+
+export function subscribeToSuperAutoConnect(listener: SuperSyncListener): () => void {
+  listeners.add(listener);
+  // Ensure connection is active
+  initSuperAutoConnect();
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+export function initSuperAutoConnect(): void {
+  if (typeof window === 'undefined' || !('EventSource' in window)) return;
+  if (globalEventSource && globalEventSource.readyState !== EventSource.CLOSED) return;
+  if (isConnecting) return;
+
+  isConnecting = true;
+
+  try {
+    const es = new EventSource('/api/users/stream');
+    globalEventSource = es;
+
+    const notify = (type: string, data: any) => {
+      if (data?.users && Array.isArray(data.users)) {
+        try {
+          localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(data.users));
+        } catch {}
+      }
+      broadcastUsersUpdated({ type, ...data });
+      for (const fn of listeners) {
+        try {
+          fn({ type, user: data?.user, users: data?.users });
+        } catch (e) {
+          console.error('Super Auto Connect listener error:', e);
+        }
+      }
+    };
+
+    es.addEventListener('user_registered', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        notify('user_registered', data);
+      } catch {}
+    });
+
+    es.addEventListener('user_updated', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        notify('user_updated', data);
+      } catch {}
+    });
+
+    es.addEventListener('user_deleted', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        notify('user_deleted', data);
+      } catch {}
+    });
+
+    es.addEventListener('users_synced', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        notify('users_synced', data);
+      } catch {}
+    });
+
+    es.onopen = () => {
+      isConnecting = false;
+      // Sync once on open to make sure nothing was missed
+      syncWithServerUsers().catch(() => {});
+    };
+
+    es.onerror = () => {
+      isConnecting = false;
+      // EventSource will automatically attempt to reconnect
+    };
+  } catch (err) {
+    isConnecting = false;
+  }
+}
+
+// Boot super auto connect automatically on client
+if (typeof window !== 'undefined') {
+  setTimeout(() => {
+    initSuperAutoConnect();
+  }, 100);
+}
+
 export function updateUserAccountName(
   userIdOrEmail: string,
   newBusinessName: string,

@@ -20,7 +20,12 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { UserRole, ValidityPlan } from '../types';
-import { authenticateUser, registerCustomer, syncWithServerUsers } from '../lib/userStore';
+import {
+  authenticateUser,
+  registerCustomer,
+  syncWithServerUsers,
+  subscribeToSuperAutoConnect,
+} from '../lib/userStore';
 
 const PACKAGES: {
   id: ValidityPlan;
@@ -178,10 +183,31 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [pendingActivationInfo, setPendingActivationInfo] = useState<PendingActivationInfo | null>(null);
 
-  // Sync users with backend server on mount
+  // Super Automatic real-time auto-connect for registration and instant activation detection
   useEffect(() => {
     syncWithServerUsers().catch(() => {});
-  }, []);
+
+    const unsubscribe = subscribeToSuperAutoConnect((payload) => {
+      if (payload.type === 'user_updated' && payload.user) {
+        const targetEmail = (username || regEmail || pendingActivationInfo?.email || '').trim().toLowerCase();
+        if (targetEmail && payload.user.email?.toLowerCase() === targetEmail) {
+          if (payload.user.status === 'active') {
+            setError(null);
+            setSuccessMsg(`🎉 Super Connect: Account (${payload.user.email}) has been ACTIVATED by Admin! You can log in now.`);
+            setMode('login');
+            setUsername(payload.user.email);
+            if (payload.user.password && !password) {
+              setPassword(payload.user.password);
+            }
+          } else if (payload.user.status === 'rejected') {
+            setError('Account registration was declined. WhatsApp: 8598912555');
+          }
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [username, regEmail, pendingActivationInfo?.email, password]);
 
   const handleCheckActivationStatus = async () => {
     const targetEmail = (username || regEmail || pendingActivationInfo?.email || '').trim().toLowerCase();
