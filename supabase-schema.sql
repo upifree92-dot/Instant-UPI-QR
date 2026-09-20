@@ -166,15 +166,16 @@ INSERT INTO public.registered_users (
     '8598912555',
     'Upi Digital Store',
     'customer',
-    'pending',
+    'active',
     '1_month',
     TIMEZONE('utc', NOW() + INTERVAL '30 days'),
     TIMEZONE('utc', NOW()),
     TIMEZONE('utc', NOW()),
-    false
+    true
 )
 ON CONFLICT (email) DO UPDATE SET
     name = EXCLUDED.name,
+    status = EXCLUDED.status,
     phone = EXCLUDED.phone;
 
 -- ==============================================================================
