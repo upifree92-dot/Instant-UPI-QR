@@ -82,18 +82,13 @@ export function buildAdminWhatsAppUrl(info: {
   const lines = [
     `🔔 *NEW ACCOUNT ACTIVATION REQUEST*`,
     ``,
-    `Hello Admin! Maine naya account register kiya hai. Kripya mera account activate karein.`,
+    `Hello Admin! I have registered a new account. Please activate my account.`,
     ``,
     `👤 *Customer Name:* ${cleanName}`,
     `📧 *Gmail / User ID:* ${info.email}`,
     info.planTitle ? `📦 *Selected Package:* ${info.planTitle} (₹${info.planPrice || 500})` : '',
     info.phone && info.phone.trim() ? `📱 *Phone Number:* ${info.phone.trim()}` : '',
-    info.store && info.store.trim() && info.store.trim() !== '...'
-      ? `🏪 *Store / Business:* ${info.store.trim()}`
-      : '',
-    ``,
-    `Admin Panel me jakar mera account Approve & Activate karein.`,
-    `Dhanyawaad!`,
+    `🏪 *Store / Business:* ${info.store && info.store.trim() ? info.store.trim() : '...'}`,
   ].filter(Boolean);
 
   return `https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent(lines.join('\n'))}`;
