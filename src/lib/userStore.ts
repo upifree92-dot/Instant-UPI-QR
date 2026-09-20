@@ -292,12 +292,47 @@ export function getRegisteredUsers(): RegisteredUser[] {
   return DEFAULT_USERS;
 }
 
+export function broadcastUsersUpdated(detail?: any): void {
+  try {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('upi_users_updated', { detail }));
+      if ('BroadcastChannel' in window) {
+        const ch = new BroadcastChannel('upi_users_sync_channel');
+        ch.postMessage({ type: 'USERS_UPDATED', timestamp: Date.now(), detail });
+        ch.close();
+      }
+    }
+  } catch {}
+}
+
 export function saveRegisteredUsers(users: RegisteredUser[]): void {
   try {
     localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(users));
+    broadcastUsersUpdated();
   } catch (err) {
     console.error('Failed to save users:', err);
   }
+}
+
+export async function syncWithServerUsers(): Promise<RegisteredUser[]> {
+  try {
+    const localUsers = getRegisteredUsers();
+    const res = await fetch('/api/users/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clientUsers: localUsers }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.users) && data.users.length > 0) {
+        localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(data.users));
+        return data.users;
+      }
+    }
+  } catch {
+    // Offline or server booting
+  }
+  return getRegisteredUsers();
 }
 
 export function updateUserAccountName(
@@ -478,6 +513,33 @@ export function registerCustomer(params: {
   const updated = [newUser, ...users];
   saveRegisteredUsers(updated);
 
+  // Send to backend server API asynchronously so Admin Panel on any device connects immediately
+  try {
+    fetch('/api/users/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: newUser.name,
+        email: newUser.email,
+        password: newUser.password,
+        phone: newUser.phone,
+        businessName: newUser.businessName,
+        role: newUser.role,
+        status: newUser.status,
+        validityPlan: newUser.validityPlan,
+      }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.user) {
+          broadcastUsersUpdated({ type: 'registered', user: data.user });
+        }
+      })
+      .catch((err) => {
+        console.warn('Backend server register sync note:', err);
+      });
+  } catch {}
+
   return { success: true, user: newUser };
 }
 
@@ -504,6 +566,15 @@ export function updateUserPassword(
 
   users[idx].password = cleanPass;
   saveRegisteredUsers(users);
+
+  // Sync with backend API
+  try {
+    fetch('/api/users/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userIdOrEmail, newPassword: cleanPass }),
+    }).catch(() => {});
+  } catch {}
 
   // If saved credentials in localStorage match this user, update them
   try {
@@ -688,29 +759,45 @@ export function updateUserStatus(
 
   const existing = users[index];
 
+  let targetPlan = existing.validityPlan || defaultPlan;
+  let targetValidFrom = existing.validFrom;
+  let targetValidUntil = existing.validUntil;
+
   // If activating and user has no validUntil or is expired, assign validity
   if (newStatus === 'active') {
     const validity = getUserValidityInfo(existing);
     if (validity.isExpired || !existing.validUntil) {
-      const plan = existing.validityPlan || defaultPlan;
-      const { validFrom, validUntil } = calculateValidityExpiry(plan);
-      users[index] = {
-        ...existing,
-        status: newStatus,
-        validityPlan: plan,
-        validFrom: existing.validFrom || validFrom,
-        validUntil,
-      };
-      saveRegisteredUsers(users);
-      return true;
+      targetPlan = existing.validityPlan || defaultPlan;
+      const calc = calculateValidityExpiry(targetPlan);
+      targetValidFrom = existing.validFrom || calc.validFrom;
+      targetValidUntil = calc.validUntil;
     }
   }
 
   users[index] = {
     ...existing,
     status: newStatus,
+    validityPlan: targetPlan,
+    validFrom: targetValidFrom,
+    validUntil: targetValidUntil,
   };
   saveRegisteredUsers(users);
+
+  // Sync to server API
+  try {
+    fetch('/api/users/update-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        status: newStatus,
+        validityPlan: targetPlan,
+        validFrom: targetValidFrom,
+        validUntil: targetValidUntil,
+      }),
+    }).catch(() => {});
+  } catch {}
+
   return true;
 }
 
@@ -747,6 +834,13 @@ export function deleteRegisteredUser(userId: string): boolean {
         u.email.toLowerCase() !== target.email.toLowerCase()
     );
     saveRegisteredUsers(filtered);
+
+    // Call server API to delete from server storage
+    try {
+      fetch(`/api/users/${encodeURIComponent(target.id)}`, {
+        method: 'DELETE',
+      }).catch(() => {});
+    } catch {}
 
     // If active session belongs to this deleted customer, clear it
     try {

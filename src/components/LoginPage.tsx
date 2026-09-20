@@ -17,9 +17,10 @@ import {
   Check,
   Calendar,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import { UserRole, ValidityPlan } from '../types';
-import { authenticateUser, registerCustomer } from '../lib/userStore';
+import { authenticateUser, registerCustomer, syncWithServerUsers } from '../lib/userStore';
 
 const PACKAGES: {
   id: ValidityPlan;
@@ -174,9 +175,50 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [pendingActivationInfo, setPendingActivationInfo] = useState<PendingActivationInfo | null>(null);
 
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  // Sync users with backend server on mount
+  useEffect(() => {
+    syncWithServerUsers().catch(() => {});
+  }, []);
+
+  const handleCheckActivationStatus = async () => {
+    const targetEmail = (username || regEmail || pendingActivationInfo?.email || '').trim().toLowerCase();
+    if (!targetEmail) {
+      setError('Please enter your User ID or Email to check status.');
+      return;
+    }
+
+    setIsCheckingStatus(true);
+    try {
+      const syncedUsers = await syncWithServerUsers();
+      const found = syncedUsers.find(
+        (u) => u.email.toLowerCase() === targetEmail || (u.phone && u.phone === targetEmail)
+      );
+
+      if (found) {
+        if (found.status === 'active') {
+          setError(null);
+          setSuccessMsg(`Great news! Your account (${found.email}) is ACTIVE! You can now log in.`);
+          setMode('login');
+          setUsername(found.email);
+        } else if (found.status === 'rejected') {
+          setError(`Account registration was declined. Please contact Admin on WhatsApp 8598912555.`);
+        } else {
+          setError(`Account (${found.email}) is still Pending Admin approval. Please contact Admin on WhatsApp 8598912555 for instant activation.`);
+        }
+      } else {
+        setError(`No registration found for "${targetEmail}". Please register first.`);
+      }
+    } catch {
+      setError('Unable to reach server. Please try again or WhatsApp Admin: 8598912555.');
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  };
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccessMsg(null);
@@ -191,43 +233,46 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      const auth = authenticateUser(trimmedUser, trimmedPass);
-      setIsLoading(false);
+    // Sync latest user list from server so admin activations are recognized immediately
+    try {
+      await syncWithServerUsers();
+    } catch {}
 
-      if (auth.success && auth.user) {
-        // Save Name and Password if option is checked
-        if (saveCredentials) {
-          try {
-            localStorage.setItem(
-              SAVED_CREDENTIALS_KEY,
-              JSON.stringify({ username: trimmedUser, password: trimmedPass })
-            );
-            localStorage.setItem(REMEMBER_PREF_KEY, 'true');
-          } catch {}
-        } else {
-          try {
-            localStorage.removeItem(SAVED_CREDENTIALS_KEY);
-            localStorage.setItem(REMEMBER_PREF_KEY, 'false');
-          } catch {}
-        }
+    const auth = authenticateUser(trimmedUser, trimmedPass);
+    setIsLoading(false);
 
-        onLoginSuccess(auth.user.email, auth.isAdmin ? 'admin' : auth.user.role);
+    if (auth.success && auth.user) {
+      // Save Name and Password if option is checked
+      if (saveCredentials) {
+        try {
+          localStorage.setItem(
+            SAVED_CREDENTIALS_KEY,
+            JSON.stringify({ username: trimmedUser, password: trimmedPass })
+          );
+          localStorage.setItem(REMEMBER_PREF_KEY, 'true');
+        } catch {}
       } else {
-        setError(auth.error || 'Invalid username or password.');
-        if (auth.error?.includes('pending') || auth.error?.includes('Activation')) {
-          setPendingActivationInfo({
-            name: 'Customer',
-            email: trimmedUser,
-            planTitle: 'Account Validity',
-            planPrice: 500,
-          });
-        }
+        try {
+          localStorage.removeItem(SAVED_CREDENTIALS_KEY);
+          localStorage.setItem(REMEMBER_PREF_KEY, 'false');
+        } catch {}
       }
-    }, 250);
+
+      onLoginSuccess(auth.user.email, auth.isAdmin ? 'admin' : auth.user.role);
+    } else {
+      setError(auth.error || 'Invalid username or password.');
+      if (auth.error?.includes('pending') || auth.error?.includes('Activation')) {
+        setPendingActivationInfo({
+          name: 'Customer',
+          email: trimmedUser,
+          planTitle: 'Account Validity',
+          planPrice: 500,
+        });
+      }
+    }
   };
 
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccessMsg(null);
@@ -243,66 +288,70 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
     setIsLoading(true);
 
-    setTimeout(() => {
-      // Clean name derived from email/username or given name
-      const rawDerived = regEmail.split('@')[0] || 'User';
-      const sanitizedName =
-        rawDerived.replace(/\bfree\b/gi, '').replace(/\s+/g, ' ').trim() || 'User';
+    // Clean name derived from email/username or given name
+    const rawDerived = regEmail.split('@')[0] || 'User';
+    const sanitizedName =
+      rawDerived.replace(/\bfree\b/gi, '').replace(/\s+/g, ' ').trim() || 'User';
 
-      const reg = registerCustomer({
-        name: sanitizedName,
-        email: regEmail.trim(),
-        password: regPassword,
-        phone: regPhone.trim(),
-        businessName: '',
-        role: 'customer',
-        status: 'pending',
-        validityPlan: selectedPlan,
-      });
+    const reg = registerCustomer({
+      name: sanitizedName,
+      email: regEmail.trim(),
+      password: regPassword,
+      phone: regPhone.trim(),
+      businessName: '',
+      role: 'customer',
+      status: 'pending',
+      validityPlan: selectedPlan,
+    });
 
+    if (!reg.success) {
       setIsLoading(false);
+      setError(reg.error || 'Registration failed.');
+      return;
+    }
 
-      if (!reg.success) {
-        setError(reg.error || 'Registration failed.');
-        return;
-      }
+    // Sync registration with server
+    try {
+      await syncWithServerUsers();
+    } catch {}
 
-      const activePkg = PACKAGES.find((p) => p.id === selectedPlan) || PACKAGES[0];
-      setPendingActivationInfo({
-        name: sanitizedName,
-        email: regEmail.trim(),
-        planTitle: activePkg.title,
-        planPrice: activePkg.price,
-        phone: regPhone.trim(),
-        store: '',
-      });
-      setSuccessMsg(
-        `Registration Submitted! Account (${regEmail.trim()}) activation request has been sent to Admin Panel (${activePkg.title} • ₹${activePkg.price}). Once activated, you will be able to log in.`
-      );
+    setIsLoading(false);
 
-      // Prepopulate login form and switch to login tab
-      setUsername(regEmail.trim());
-      setPassword(regPassword);
+    const activePkg = PACKAGES.find((p) => p.id === selectedPlan) || PACKAGES[0];
+    setPendingActivationInfo({
+      name: sanitizedName,
+      email: regEmail.trim(),
+      planTitle: activePkg.title,
+      planPrice: activePkg.price,
+      phone: regPhone.trim(),
+      store: '',
+    });
+    setSuccessMsg(
+      `Registration Submitted! Account (${regEmail.trim()}) activation request has been sent to Admin Panel (${activePkg.title} • ₹${activePkg.price}). Once activated, you will be able to log in.`
+    );
 
-      if (saveCredentials) {
-        try {
-          localStorage.setItem(
-            SAVED_CREDENTIALS_KEY,
-            JSON.stringify({ username: regEmail.trim(), password: regPassword })
-          );
-          setHasSavedCredentials(true);
-        } catch {}
-      }
+    // Prepopulate login form and switch to login tab
+    setUsername(regEmail.trim());
+    setPassword(regPassword);
 
-      setMode('login');
+    if (saveCredentials) {
+      try {
+        localStorage.setItem(
+          SAVED_CREDENTIALS_KEY,
+          JSON.stringify({ username: regEmail.trim(), password: regPassword })
+        );
+        setHasSavedCredentials(true);
+      } catch {}
+    }
 
-      // Clear reg form
-      setRegName('');
-      setRegEmail('');
-      setRegPassword('');
-      setRegPhone('');
-      setRegStore('');
-    }, 300);
+    setMode('login');
+
+    // Clear reg form
+    setRegName('');
+    setRegEmail('');
+    setRegPassword('');
+    setRegPhone('');
+    setRegStore('');
   };
 
   return (
@@ -444,6 +493,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                   </div>
                   <ArrowRight className="w-4 h-4 text-white shrink-0 group-hover:translate-x-1 transition-transform" />
                 </a>
+              </div>
+
+              {/* Check Activation Status Button */}
+              <div className="pt-0.5">
+                <button
+                  type="button"
+                  onClick={handleCheckActivationStatus}
+                  disabled={isCheckingStatus}
+                  className="w-full py-2.5 px-3 bg-white hover:bg-emerald-50 active:scale-[0.98] text-emerald-800 border border-emerald-300 font-extrabold text-xs rounded-xl shadow-2xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-60"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${isCheckingStatus ? 'animate-spin' : ''}`} />
+                  <span>{isCheckingStatus ? 'Checking with Admin Panel...' : 'Check Activation Status (Refresh)'}</span>
+                </button>
               </div>
             </div>
           )}

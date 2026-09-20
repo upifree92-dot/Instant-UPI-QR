@@ -65,6 +65,7 @@ import {
   updateUserValidity,
   getUserValidityInfo,
   updateUserPassword,
+  syncWithServerUsers,
 } from '../lib/userStore';
 
 interface AdminPanelProps {
@@ -302,6 +303,91 @@ create policy "Allow all access to transactions" on transactions for all using (
     setUnreadNotifications(getUnreadRegistrationCount());
     setSelectedCustomer((prev) => (prev ? list.find((u) => u.id === prev.id) || null : null));
   };
+
+  const [isSyncingUsers, setIsSyncingUsers] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string>('Live');
+
+  const handleManualSyncUsers = async () => {
+    setIsSyncingUsers(true);
+    try {
+      const updated = await syncWithServerUsers();
+      setUsersList(updated);
+      setUnreadNotifications(getUnreadRegistrationCount());
+      setSelectedCustomer((prev) => (prev ? updated.find((u) => u.id === prev.id) || null : null));
+      setLastSyncTime(
+        new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      );
+      setValidityToast({
+        message: `Synced with Server: ${updated.length} customer accounts active and connected!`,
+        type: 'success',
+      });
+      setTimeout(() => setValidityToast(null), 3000);
+    } catch {
+      refreshUsersData();
+    } finally {
+      setIsSyncingUsers(false);
+    }
+  };
+
+  // Auto-connect and sync customers with server and all browser tabs in real-time
+  useEffect(() => {
+    // Initial server pull
+    syncWithServerUsers().then((synced) => {
+      setUsersList(synced);
+      setUnreadNotifications(getUnreadRegistrationCount());
+    });
+
+    // 1. Polling interval every 3s to pull any new customer registrations from server
+    const pollInterval = setInterval(async () => {
+      try {
+        const synced = await syncWithServerUsers();
+        setUsersList(synced);
+        setUnreadNotifications(getUnreadRegistrationCount());
+        setSelectedCustomer((prev) => (prev ? synced.find((u) => u.id === prev.id) || null : null));
+      } catch {}
+    }, 3000);
+
+    // 2. BroadcastChannel for instant cross-tab updates without delay
+    let bc: BroadcastChannel | null = null;
+    try {
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        bc = new BroadcastChannel('upi_users_sync_channel');
+        bc.onmessage = (ev) => {
+          refreshUsersData();
+          if (ev.data?.detail?.user) {
+            setValidityToast({
+              message: `New Customer Registration received: ${
+                ev.data.detail.user.name || ev.data.detail.user.email
+              }!`,
+              type: 'info',
+            });
+            setTimeout(() => setValidityToast(null), 4000);
+          }
+        };
+      }
+    } catch {}
+
+    // 3. Local CustomEvent & Storage listeners
+    const handleSyncEvent = (e: any) => {
+      refreshUsersData();
+      if (e?.detail?.user) {
+        setValidityToast({
+          message: `New Customer Registration received: ${e.detail.user.name || e.detail.user.email}!`,
+          type: 'info',
+        });
+        setTimeout(() => setValidityToast(null), 4000);
+      }
+    };
+    window.addEventListener('upi_users_updated', handleSyncEvent);
+    window.addEventListener('storage', handleSyncEvent);
+
+    return () => {
+      clearInterval(pollInterval);
+      if (bc) bc.close();
+      window.removeEventListener('upi_users_updated', handleSyncEvent);
+      window.removeEventListener('storage', handleSyncEvent);
+    };
+  }, []);
 
   const [customerToDelete, setCustomerToDelete] = useState<RegisteredUser | null>(null);
 
@@ -1106,6 +1192,18 @@ create policy "Allow all access to transactions" on transactions for all using (
                       </button>
                     );
                   })}
+
+                  <button
+                    type="button"
+                    onClick={handleManualSyncUsers}
+                    disabled={isSyncingUsers}
+                    title="Sync and connect all customer registrations with server in real-time"
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0 ml-auto"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${isSyncingUsers ? 'animate-spin' : ''}`} />
+                    <span>{isSyncingUsers ? 'Connecting...' : 'Sync Server'}</span>
+                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  </button>
                 </div>
               </div>
             </div>
