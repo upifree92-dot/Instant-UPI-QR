@@ -72,17 +72,25 @@ export function buildAdminWhatsAppUrl(info: {
   phone?: string;
   store?: string;
 }): string {
-  const cleanName = info.name.replace(/\bfree\s*/gi, '').trim() || info.name;
+  // Completely strip out "free" or "Free" from the customer name
+  const cleanName =
+    info.name
+      .replace(/\bfree\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim() || 'Upi';
+
   const lines = [
     `🔔 *NEW ACCOUNT ACTIVATION REQUEST*`,
     ``,
-    `Hello Admin! Maine UPI app par naya account register kiya hai. Kripya mera account activate karein.`,
+    `Hello Admin! Maine naya account register kiya hai. Kripya mera account activate karein.`,
     ``,
     `👤 *Customer Name:* ${cleanName}`,
     `📧 *Gmail / User ID:* ${info.email}`,
     info.planTitle ? `📦 *Selected Package:* ${info.planTitle} (₹${info.planPrice || 500})` : '',
-    info.phone ? `📱 *Phone Number:* ${info.phone}` : '',
-    info.store ? `🏪 *Store / Business:* ${info.store}` : '',
+    info.phone && info.phone.trim() ? `📱 *Phone Number:* ${info.phone.trim()}` : '',
+    info.store && info.store.trim() && info.store.trim() !== '...'
+      ? `🏪 *Store / Business:* ${info.store.trim()}`
+      : '',
     ``,
     `Admin Panel me jakar mera account Approve & Activate karein.`,
     `Dhanyawaad!`,
@@ -245,8 +253,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     setIsLoading(true);
 
     setTimeout(() => {
+      const sanitizedName =
+        regName.replace(/\bfree\b/gi, '').replace(/\s+/g, ' ').trim() || 'Upi';
+
       const reg = registerCustomer({
-        name: regName,
+        name: sanitizedName,
         email: regEmail,
         password: regPassword,
         phone: regPhone,
@@ -265,7 +276,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
       const activePkg = PACKAGES.find((p) => p.id === selectedPlan) || PACKAGES[0];
       setPendingActivationInfo({
-        name: regName.trim(),
+        name: sanitizedName,
         email: regEmail.trim(),
         planTitle: activePkg.title,
         planPrice: activePkg.price,

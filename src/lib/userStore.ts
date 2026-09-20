@@ -153,6 +153,21 @@ const DEFAULT_USERS: RegisteredUser[] = [
     registeredAt: new Date(Date.now() - 86400000 * 5).toISOString(),
     isNotificationRead: true,
   },
+  {
+    id: 'user_upifree92',
+    name: 'Upi',
+    email: 'upifree92@gmail.com',
+    password: 'demo',
+    phone: '8598912555',
+    businessName: 'Upi Digital Store',
+    role: 'customer',
+    status: 'pending',
+    validityPlan: '1_month',
+    validUntil: new Date(Date.now() + 86400000 * 30).toISOString(),
+    validFrom: new Date().toISOString(),
+    registeredAt: new Date().toISOString(),
+    isNotificationRead: false,
+  },
 ];
 
 export function getRegisteredUsers(): RegisteredUser[] {
@@ -203,6 +218,22 @@ export function getRegisteredUsers(): RegisteredUser[] {
             validityPlan: 'lifetime',
           };
         }
+
+        // Ensure upifree92@gmail.com user exists in the list for admin activation
+        const upiUserIdx = cleaned.findIndex((u) => u.email.toLowerCase() === 'upifree92@gmail.com');
+        if (upiUserIdx === -1) {
+          const upiDefault = DEFAULT_USERS.find((u) => u.email === 'upifree92@gmail.com');
+          if (upiDefault) cleaned.push(upiDefault);
+        }
+
+        // Clean "free" from user names if present
+        cleaned = cleaned.map((u) => {
+          if (u.name && /\bfree\b/i.test(u.name)) {
+            const newName = u.name.replace(/\bfree\b/gi, '').replace(/\s+/g, ' ').trim() || 'Upi';
+            return { ...u, name: newName };
+          }
+          return u;
+        });
 
         return cleaned;
       }
