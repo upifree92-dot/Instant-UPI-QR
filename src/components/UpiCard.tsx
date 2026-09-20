@@ -61,12 +61,12 @@ export const UpiCard: React.FC<UpiCardProps> = ({
           <h2 className="font-bold text-[19px] sm:text-xl text-slate-900 leading-tight">
             {config.storeName || 'Sharma General Store'}
           </h2>
-          {!isCustomer && onOpenSettings && (
+          {onOpenSettings && (
             <button
               id="btn-edit-store-name"
               type="button"
               onClick={onOpenSettings}
-              title="Edit Store Name & UPI ID"
+              title="Edit Store Name, UPI ID & Surcharge %"
               className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-emerald-700 transition-colors cursor-pointer"
             >
               <Pencil className="w-3.5 h-3.5" />
@@ -77,7 +77,7 @@ export const UpiCard: React.FC<UpiCardProps> = ({
           {config.upiId || 'sharmastore@okhdfcbank'}
         </p>
 
-        {!isCustomer && config.storeName === 'Sharma General Store' && onOpenSettings && (
+        {config.storeName === 'Sharma General Store' && onOpenSettings && (
           <button
             type="button"
             onClick={onOpenSettings}

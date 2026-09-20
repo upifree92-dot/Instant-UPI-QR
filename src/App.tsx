@@ -472,7 +472,7 @@ export default function App() {
           config={config}
           finalAmount={finalAmount}
           baseAmount={baseAmount}
-          onOpenSettings={userRole === 'admin' ? () => setIsSettingsOpen(true) : undefined}
+          onOpenSettings={() => setIsSettingsOpen(true)}
           isCustomer={userRole !== 'admin'}
         />
 
