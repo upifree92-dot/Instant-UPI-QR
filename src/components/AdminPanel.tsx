@@ -1254,11 +1254,11 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                         </div>
                       </div>
 
-                      {/* Customer Credentials (Email & Password) */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 py-2.5 text-xs">
+                      {/* Customer Credentials & Configuration */}
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 py-2.5 text-xs">
                         <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
                           <span className="text-slate-400 block text-[10px] uppercase font-bold">
-                            Login Email / Username:
+                            Login ID:
                           </span>
                           <span className="text-slate-900 font-bold font-mono truncate block">
                             {user.email}
@@ -1290,10 +1290,19 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
 
                         <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
                           <span className="text-slate-400 block text-[10px] uppercase font-bold">
-                            Mobile / Phone:
+                            UPI ID:
+                          </span>
+                          <span className="text-slate-900 font-bold font-mono truncate block">
+                            {user.upiId || 'sharmastore@okhdfcbank'}
+                          </span>
+                        </div>
+
+                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-200">
+                          <span className="text-slate-400 block text-[10px] uppercase font-bold">
+                            Extra Surcharge:
                           </span>
                           <span className="text-slate-900 font-bold font-mono">
-                            {user.phone || 'Not provided'}
+                            {user.isExtraEnabled !== false ? `+${user.extraPercentage ?? 2}%` : 'Off'}
                           </span>
                         </div>
                       </div>

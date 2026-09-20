@@ -9,6 +9,9 @@ export interface RegisteredUser {
   password: string;
   phone?: string;
   businessName?: string;
+  upiId?: string;
+  extraPercentage?: number;
+  isExtraEnabled?: boolean;
   role: UserRole;
   status: 'active' | 'pending' | 'rejected';
   validityPlan?: ValidityPlan;

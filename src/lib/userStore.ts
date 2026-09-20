@@ -1,4 +1,4 @@
-import { RegisteredUser, UserRole, ValidityPlan } from '../types';
+import { MerchantConfig, RegisteredUser, UserRole, ValidityPlan } from '../types';
 
 const USERS_STORAGE_KEY = 'upi_registered_users_v4';
 
@@ -261,6 +261,88 @@ export function getUserByEmail(emailOrId: string): RegisteredUser | undefined {
       u.id === emailOrId ||
       (u.phone && u.phone.toLowerCase() === clean)
   );
+}
+
+export function getUserConfigKey(userEmailOrId: string): string {
+  return `upi_user_config_${userEmailOrId.trim().toLowerCase()}`;
+}
+
+export function saveUserCustomConfig(
+  userEmailOrId: string,
+  newConfig: Partial<MerchantConfig>
+): void {
+  if (!userEmailOrId) return;
+  const clean = userEmailOrId.trim().toLowerCase();
+
+  // 1. Per-user distinct localStorage persistence
+  try {
+    const key = getUserConfigKey(clean);
+    const existingRaw = localStorage.getItem(key);
+    const existing = existingRaw ? JSON.parse(existingRaw) : {};
+    const merged = { ...existing, ...newConfig };
+    localStorage.setItem(key, JSON.stringify(merged));
+  } catch (e) {
+    console.error('Failed to save user custom config to localStorage', e);
+  }
+
+  // 2. Also permanently update RegisteredUser store for this user ID
+  const users = getRegisteredUsers();
+  const idx = users.findIndex(
+    (u) =>
+      u.email.toLowerCase() === clean ||
+      u.id === userEmailOrId ||
+      (u.phone && u.phone.toLowerCase() === clean)
+  );
+  if (idx !== -1) {
+    if (newConfig.storeName !== undefined && newConfig.storeName.trim()) {
+      users[idx].businessName = newConfig.storeName.trim();
+    }
+    if (newConfig.upiId !== undefined && newConfig.upiId.trim()) {
+      users[idx].upiId = newConfig.upiId.trim();
+    }
+    if (newConfig.extraPercentage !== undefined) {
+      users[idx].extraPercentage = Number(newConfig.extraPercentage);
+    }
+    if (newConfig.isExtraEnabled !== undefined) {
+      users[idx].isExtraEnabled = Boolean(newConfig.isExtraEnabled);
+    }
+    saveRegisteredUsers(users);
+  }
+}
+
+export function getUserSavedConfig(userEmailOrId: string): Partial<MerchantConfig> | null {
+  if (!userEmailOrId) return null;
+  const clean = userEmailOrId.trim().toLowerCase();
+
+  let perUserLocal: Partial<MerchantConfig> | null = null;
+  try {
+    const key = getUserConfigKey(clean);
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        perUserLocal = parsed;
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  // Also read from RegisteredUser record
+  const user = getUserByEmail(clean);
+  const userObjConfig: Partial<MerchantConfig> = {};
+  if (user) {
+    if (user.businessName) userObjConfig.storeName = user.businessName;
+    if (user.upiId) userObjConfig.upiId = user.upiId;
+    if (user.extraPercentage !== undefined) userObjConfig.extraPercentage = user.extraPercentage;
+    if (user.isExtraEnabled !== undefined) userObjConfig.isExtraEnabled = user.isExtraEnabled;
+  }
+
+  const merged = { ...userObjConfig, ...(perUserLocal || {}) };
+  if (Object.keys(merged).length > 0) {
+    return merged;
+  }
+  return null;
 }
 
 export function registerCustomer(params: {

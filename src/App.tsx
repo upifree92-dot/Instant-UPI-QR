@@ -19,7 +19,13 @@ import { announceSoundbox } from './utils/sound';
 import { buildUpiPayUrl } from './utils/upi';
 import { Volume2, CheckCircle2, Share2, ShieldCheck, ArrowLeft, User, Edit3, Check, X } from 'lucide-react';
 import { fetchMerchantConfigFromCloud, saveMerchantConfigToCloud } from './lib/supabase';
-import { getUserByEmail, getUserValidityInfo, updateUserAccountName } from './lib/userStore';
+import {
+  getUserByEmail,
+  getUserValidityInfo,
+  updateUserAccountName,
+  getUserSavedConfig,
+  saveUserCustomConfig,
+} from './lib/userStore';
 
 const STORAGE_KEY = 'upi_merchant_config_v1';
 const AUTH_STORAGE_KEY = 'upi_merchant_authenticated_v1';
@@ -42,6 +48,27 @@ const DEFAULT_CONFIG: MerchantConfig = {
 export default function App() {
   const [config, setConfig] = useState<MerchantConfig>(() => {
     try {
+      const activeUser = localStorage.getItem(LOGGED_IN_USER_KEY);
+      if (activeUser) {
+        const userSaved = getUserSavedConfig(activeUser);
+        if (userSaved) {
+          return {
+            ...DEFAULT_CONFIG,
+            ...userSaved,
+            storeName: userSaved.storeName || DEFAULT_CONFIG.storeName,
+            upiId: userSaved.upiId || DEFAULT_CONFIG.upiId,
+            extraPercentage:
+              userSaved.extraPercentage !== undefined
+                ? userSaved.extraPercentage
+                : DEFAULT_CONFIG.extraPercentage,
+            isExtraEnabled:
+              userSaved.isExtraEnabled !== undefined
+                ? userSaved.isExtraEnabled
+                : DEFAULT_CONFIG.isExtraEnabled,
+          };
+        }
+      }
+
       const saved = localStorage.getItem(STORAGE_KEY);
       const savedStoreName = localStorage.getItem(STORE_NAME_KEY);
       const savedUpiId = localStorage.getItem(UPI_ID_KEY);
@@ -128,17 +155,18 @@ export default function App() {
     };
     setConfig(updatedConfig);
 
+    // 2. Permanently save to current user ID
+    if (currentUserEmail) {
+      saveUserCustomConfig(currentUserEmail, { storeName: trimmed });
+      updateUserAccountName(currentUserEmail, trimmed, trimmed);
+      setUserStoreVersion((v) => v + 1);
+    }
+
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedConfig));
       localStorage.setItem(STORE_NAME_KEY, trimmed);
     } catch {
       // storage error fallback
-    }
-
-    // 2. Update user profile in persistent user store
-    if (currentUserEmail) {
-      updateUserAccountName(currentUserEmail, trimmed, trimmed);
-      setUserStoreVersion((v) => v + 1);
     }
 
     // 3. Auto-sync to Supabase cloud
@@ -173,14 +201,43 @@ export default function App() {
     setUserRole(role);
     setCurrentUserEmail(user);
 
-    // If customer has a registered store/businessName, sync it to config
+    // Load THIS specific user ID's saved storeName, UPI ID, extra percentage
+    const userSaved = getUserSavedConfig(user);
     const registered = getUserByEmail(user);
-    if (registered && registered.businessName) {
-      setConfig((prev) => ({
+
+    setConfig((prev) => {
+      const updatedUserConfig: MerchantConfig = {
+        ...DEFAULT_CONFIG,
         ...prev,
-        storeName: registered.businessName || prev.storeName,
-      }));
-    }
+        ...userSaved,
+        storeName:
+          userSaved?.storeName ||
+          registered?.businessName ||
+          (user === 'demo9090' ? 'Demo Store' : prev.storeName),
+        upiId:
+          userSaved?.upiId ||
+          registered?.upiId ||
+          prev.upiId,
+        extraPercentage:
+          userSaved?.extraPercentage !== undefined
+            ? userSaved.extraPercentage
+            : (registered?.extraPercentage !== undefined ? registered.extraPercentage : prev.extraPercentage),
+        isExtraEnabled:
+          userSaved?.isExtraEnabled !== undefined
+            ? userSaved.isExtraEnabled
+            : (registered?.isExtraEnabled !== undefined ? registered.isExtraEnabled : prev.isExtraEnabled),
+      };
+
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedUserConfig));
+        localStorage.setItem(STORE_NAME_KEY, updatedUserConfig.storeName);
+        localStorage.setItem(UPI_ID_KEY, updatedUserConfig.upiId);
+      } catch {
+        // storage fallback
+      }
+
+      return updatedUserConfig;
+    });
 
     // Only allow admin into admin panel
     setCurrentView(role === 'admin' ? 'admin' : 'terminal');
@@ -191,7 +248,6 @@ export default function App() {
       localStorage.removeItem(AUTH_STORAGE_KEY);
       localStorage.removeItem(USER_ROLE_KEY);
       localStorage.removeItem(LOGGED_IN_USER_KEY);
-      // NOTE: We do NOT wipe out STORE_NAME_KEY or UPI_ID_KEY so merchant details persist
     } catch {
       // storage error fallback
     }
@@ -202,28 +258,58 @@ export default function App() {
     setBaseAmount(0);
   };
 
-  // Fetch latest config from Supabase Cloud on startup
+  // Fetch latest config from Supabase Cloud on startup (protects user's saved config)
   useEffect(() => {
     fetchMerchantConfigFromCloud().then((cloudConfig) => {
       if (cloudConfig && (cloudConfig.storeName || cloudConfig.upiId)) {
-        setConfig((prev) => ({
-          ...prev,
-          ...cloudConfig,
-          storeName: cloudConfig.storeName || prev.storeName,
-          upiId: cloudConfig.upiId || prev.upiId,
-        }));
+        setConfig((prev) => {
+          const userSaved = currentUserEmail ? getUserSavedConfig(currentUserEmail) : null;
+          if (userSaved && (userSaved.storeName || userSaved.upiId)) {
+            // Preserve user's personalized saved details
+            return {
+              ...prev,
+              ...cloudConfig,
+              storeName: userSaved.storeName || prev.storeName,
+              upiId: userSaved.upiId || prev.upiId,
+              extraPercentage:
+                userSaved.extraPercentage !== undefined
+                  ? userSaved.extraPercentage
+                  : prev.extraPercentage,
+              isExtraEnabled:
+                userSaved.isExtraEnabled !== undefined
+                  ? userSaved.isExtraEnabled
+                  : prev.isExtraEnabled,
+            };
+          }
+          return {
+            ...prev,
+            ...cloudConfig,
+            storeName: cloudConfig.storeName || prev.storeName,
+            upiId: cloudConfig.upiId || prev.upiId,
+          };
+        });
       }
     });
-  }, []);
+  }, [currentUserEmail]);
 
-  // Save config to localStorage immediately & whenever updated, and sync to Supabase Cloud
+  // Save config to localStorage immediately & whenever updated, and sync to user profile & Supabase Cloud
   const handleSaveConfig = (newConfig: MerchantConfig) => {
     const updated: MerchantConfig = {
       ...newConfig,
       storeName: newConfig.storeName.trim() || 'Sharma General Store',
       upiId: newConfig.upiId.trim() || 'sharmastore@okhdfcbank',
+      extraPercentage: Number(newConfig.extraPercentage),
+      isExtraEnabled: Boolean(newConfig.isExtraEnabled),
     };
     setConfig(updated);
+
+    // 1. Permanently bind and save to currentUserEmail ID
+    if (currentUserEmail) {
+      saveUserCustomConfig(currentUserEmail, updated);
+      updateUserAccountName(currentUserEmail, updated.storeName, updated.storeName);
+      setUserStoreVersion((v) => v + 1);
+    }
+
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       localStorage.setItem(STORE_NAME_KEY, updated.storeName);
@@ -242,7 +328,12 @@ export default function App() {
         ...DEFAULT_CONFIG,
         storeName: prev.storeName,
         upiId: prev.upiId,
+        extraPercentage: prev.extraPercentage,
+        isExtraEnabled: prev.isExtraEnabled,
       };
+      if (currentUserEmail) {
+        saveUserCustomConfig(currentUserEmail, updated);
+      }
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       } catch {
@@ -252,7 +343,7 @@ export default function App() {
     });
   };
 
-  // Keep localStorage in sync with config changes
+  // Keep localStorage & user config in sync with config changes
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
@@ -262,10 +353,13 @@ export default function App() {
       if (config.upiId) {
         localStorage.setItem(UPI_ID_KEY, config.upiId);
       }
+      if (currentUserEmail) {
+        saveUserCustomConfig(currentUserEmail, config);
+      }
     } catch {
       // storage error fallback
     }
-  }, [config]);
+  }, [config, currentUserEmail]);
 
   // Calculate final amount with surcharge
   const finalAmount = useMemo(() => {
