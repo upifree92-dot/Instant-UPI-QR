@@ -121,14 +121,13 @@ export const AmountSection: React.FC<AmountSectionProps> = ({
             <>
               <Check className="w-3.5 h-3.5 stroke-[3]" />
               <span>
-                +{config.extraPercentage}% Extra{' '}
-                {config.language === 'hi' ? 'चालू' : 'ON'}
+                +{config.extraPercentage}% Extra ON
               </span>
             </>
           ) : (
             <>
               <X className="w-3.5 h-3.5 stroke-[3]" />
-              <span>Extra {config.language === 'hi' ? 'बंद' : 'OFF'}</span>
+              <span>Extra OFF</span>
             </>
           )}
         </button>

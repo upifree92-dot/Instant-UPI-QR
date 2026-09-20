@@ -72,7 +72,7 @@ export const Header: React.FC<HeaderProps> = ({
             id="btn-toggle-lang"
             type="button"
             onClick={onToggleLanguage}
-            title={language === 'en' ? 'Switch to Hindi (हिन्दी)' : 'Switch to English'}
+            title={language === 'en' ? 'Language: English' : 'Language: Hindi'}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-bold text-xs hover:bg-slate-50 active:scale-95 transition-all shadow-xs cursor-pointer"
           >
             <Globe className="w-3.5 h-3.5 text-emerald-600 stroke-[2.2]" />

@@ -56,15 +56,13 @@ export const PaymentSuccessModal: React.FC<PaymentSuccessModalProps> = ({
         {/* Soundbox Voice Badge */}
         <div className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold mb-3">
           <Volume2 className="w-3.5 h-3.5 text-emerald-600 animate-bounce" />
-          <span>
-            {config.language === 'hi' ? 'साउंडबॉक्स अलर्ट' : 'Soundbox Voice Alert'}
-          </span>
+          <span>Soundbox Voice Alert</span>
         </div>
 
         {/* Large Amount Display */}
         <div className="mb-2">
           <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400 block mb-0.5">
-            {config.language === 'hi' ? 'भुगतान प्राप्त हुआ' : 'Payment Received'}
+            Payment Received
           </span>
           <div className="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight">
             ₹{amount % 1 === 0 ? amount : amount.toFixed(2)}
@@ -73,9 +71,7 @@ export const PaymentSuccessModal: React.FC<PaymentSuccessModalProps> = ({
 
         {/* Success Status Text */}
         <p className="text-sm font-bold text-emerald-700 mb-4">
-          {config.language === 'hi'
-            ? 'पेमेंट सफलतापूर्वक प्राप्त हुआ!'
-            : 'Payment Successful!'}
+          Payment Received Successfully!
         </p>
 
         {/* Store & Transaction Details Card */}
@@ -116,7 +112,7 @@ export const PaymentSuccessModal: React.FC<PaymentSuccessModalProps> = ({
           onClick={onClose}
           className="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/20 active:scale-98 transition-all"
         >
-          {config.language === 'hi' ? 'ठीक है (Done)' : 'Done'}
+          Done
         </button>
       </div>
     </div>

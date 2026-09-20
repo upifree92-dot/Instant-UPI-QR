@@ -95,7 +95,7 @@ export const SoundboxCard: React.FC<SoundboxCardProps> = ({
           <div className="flex items-center justify-between text-[10px] text-emerald-400/80 font-bold uppercase tracking-wider mb-1">
             <span>Payment Received</span>
             <span className="text-slate-400 font-mono">
-              {config.language === 'hi' ? 'हिन्दी आवाज़' : 'English Voice'}
+              {config.language === 'hi' ? 'Hindi Voice' : 'English Voice'}
             </span>
           </div>
 
@@ -153,9 +153,7 @@ export const SoundboxCard: React.FC<SoundboxCardProps> = ({
             >
               <RotateCcw className={`w-3.5 h-3.5 ${isPlaying ? 'animate-spin' : ''}`} />
               <span>
-                {config.language === 'hi'
-                  ? `आवाज़ सुनें (₹${displayAmount})`
-                  : `Play Voice (₹${displayAmount})`}
+                Play Voice (₹{displayAmount})
               </span>
             </button>
 

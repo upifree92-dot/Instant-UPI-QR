@@ -315,7 +315,7 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                   className="px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-semibold"
                 >
                   <option value="en">English</option>
-                  <option value="hi">हिंदी (Hindi)</option>
+                  <option value="hi">Hindi</option>
                 </select>
               </div>
 
@@ -412,7 +412,7 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                   title="Switch to Admin Control Panel"
                 >
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Admin Panel (demo11)</span>
+                  <span>Admin Panel</span>
                 </button>
               )}
             </div>
@@ -441,12 +441,12 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
               {saveSuccess ? (
                 <>
                   <Check className="w-4 h-4" />
-                  <span>Saved! (सुरक्षित हो गया)</span>
+                  <span>Saved Successfully!</span>
                 </>
               ) : (
                 <>
                   <Save className="w-4 h-4" />
-                  <span>Save Details (सेव करें)</span>
+                  <span>Save Details</span>
                 </>
               )}
             </button>

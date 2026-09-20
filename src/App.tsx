@@ -17,9 +17,9 @@ import { AdminPanel } from './components/AdminPanel';
 import { MerchantConfig, UserRole } from './types';
 import { announceSoundbox } from './utils/sound';
 import { buildUpiPayUrl } from './utils/upi';
-import { Volume2, CheckCircle2, Share2, ShieldCheck, ArrowLeft, User, Cloud } from 'lucide-react';
+import { Volume2, CheckCircle2, Share2, ShieldCheck, ArrowLeft, User, Cloud, Edit3, Check, X } from 'lucide-react';
 import { fetchMerchantConfigFromCloud, saveMerchantConfigToCloud } from './lib/supabase';
-import { getUserByEmail, getUserValidityInfo } from './lib/userStore';
+import { getUserByEmail, getUserValidityInfo, updateUserAccountName } from './lib/userStore';
 
 const STORAGE_KEY = 'upi_merchant_config_v1';
 const AUTH_STORAGE_KEY = 'upi_merchant_authenticated_v1';
@@ -101,15 +101,55 @@ export default function App() {
     }
   });
 
+  const [userStoreVersion, setUserStoreVersion] = useState<number>(0);
+  const [accountRenameText, setAccountRenameText] = useState<string>('');
+  const [isRenamingAccount, setIsRenamingAccount] = useState<boolean>(false);
+  const [renameAutoSaved, setRenameAutoSaved] = useState<boolean>(false);
+
   const currentUser = useMemo(() => {
     if (!currentUserEmail) return undefined;
     return getUserByEmail(currentUserEmail);
-  }, [currentUserEmail]);
+  }, [currentUserEmail, userStoreVersion]);
 
   const customerValidity = useMemo(() => {
     if (!currentUser) return null;
     return getUserValidityInfo(currentUser);
   }, [currentUser]);
+
+  // Automatic saving of customer account rename
+  const handleAutoSaveAccountName = (newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+
+    // 1. Update config storeName
+    const updatedConfig: MerchantConfig = {
+      ...config,
+      storeName: trimmed,
+    };
+    setConfig(updatedConfig);
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedConfig));
+      localStorage.setItem(STORE_NAME_KEY, trimmed);
+    } catch {
+      // storage error fallback
+    }
+
+    // 2. Update user profile in persistent user store
+    if (currentUserEmail) {
+      updateUserAccountName(currentUserEmail, trimmed, trimmed);
+      setUserStoreVersion((v) => v + 1);
+    }
+
+    // 3. Auto-sync to Supabase cloud
+    saveMerchantConfigToCloud(updatedConfig);
+
+    // 4. Show Auto-Saved confirmation feedback
+    setRenameAutoSaved(true);
+    setTimeout(() => {
+      setRenameAutoSaved(false);
+    }, 2500);
+  };
 
   const [currentView, setCurrentView] = useState<'terminal' | 'admin'>(() => {
     try {
@@ -316,7 +356,7 @@ export default function App() {
           <div className="bg-slate-900 text-white px-3.5 py-2 rounded-xl flex items-center justify-between text-xs border border-emerald-500/40 shadow-xs">
             <div className="flex items-center gap-1.5 font-bold">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span>Admin Preview Mode (demo11)</span>
+              <span>Admin Control Mode</span>
             </div>
             <button
               type="button"
@@ -342,40 +382,105 @@ export default function App() {
 
         {/* Customer Account & Supabase Cloud Connection Status Card */}
         {userRole !== 'admin' && (
-          <div className="bg-white/95 rounded-2xl p-2.5 px-3.5 border border-emerald-200 shadow-2xs flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 rounded-xl bg-emerald-100/90 text-emerald-800 flex items-center justify-center font-extrabold shrink-0">
-                <User className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <div className="font-extrabold text-slate-800 text-xs truncate">
-                  {currentUser?.businessName || currentUser?.name || config.storeName}
+          <div className="bg-white/95 rounded-2xl p-3 border border-emerald-200 shadow-2xs space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100/90 text-emerald-800 flex items-center justify-center font-extrabold shrink-0">
+                  <User className="w-4 h-4" />
                 </div>
-                <div className="text-[11px] font-bold text-emerald-700 flex items-center gap-1.5 flex-wrap">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>
-                    Valid: {customerValidity?.planLabel || 'Active Plan'}
-                  </span>
-                  {customerValidity && !customerValidity.isLifetime && (
-                    <span className="text-slate-500 font-medium">
-                      ({customerValidity.daysRemaining} days left)
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-extrabold text-slate-800 text-xs truncate max-w-[150px] sm:max-w-[200px]">
+                      {currentUser?.businessName || currentUser?.name || config.storeName}
                     </span>
-                  )}
+
+                    {/* Rename Button */}
+                    <button
+                      id="btn-front-rename-account"
+                      type="button"
+                      onClick={() => {
+                        setAccountRenameText(
+                          currentUser?.businessName || currentUser?.name || config.storeName
+                        );
+                        setIsRenamingAccount(!isRenamingAccount);
+                      }}
+                      className="text-[10px] font-bold text-emerald-800 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg flex items-center gap-1 transition-all active:scale-95 cursor-pointer shrink-0"
+                      title="Rename account - automatically saves"
+                    >
+                      <Edit3 className="w-2.5 h-2.5 text-emerald-700" />
+                      <span>{isRenamingAccount ? 'Cancel' : 'Rename'}</span>
+                    </button>
+
+                    {/* Auto-saved badge */}
+                    {renameAutoSaved && (
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 rounded-md flex items-center gap-1 animate-in fade-in shrink-0">
+                        <Check className="w-2.5 h-2.5 text-emerald-600 stroke-[3]" />
+                        <span>Auto-saved</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="text-[11px] font-bold text-emerald-700 flex items-center gap-1.5 flex-wrap">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>
+                      Valid: {customerValidity?.planLabel || 'Active Plan'}
+                    </span>
+                    {customerValidity && !customerValidity.isLifetime && (
+                      <span className="text-slate-500 font-medium">
+                        ({customerValidity.daysRemaining} days left)
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
+
+              {/* Supabase Connect Button - Opens Settings */}
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-[11px] font-bold shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
+                title="Supabase Cloud Database Connected - Open Settings to view details"
+              >
+                <Cloud className="w-3.5 h-3.5 text-emerald-600 fill-emerald-500 shrink-0" />
+                <span className="hidden xs:inline">Supabase</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              </button>
             </div>
 
-            {/* Supabase Connect Button - Opens Settings */}
-            <button
-              type="button"
-              onClick={() => setIsSettingsOpen(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-[11px] font-bold shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
-              title="Supabase Cloud Database Connected - Open Settings to view details"
-            >
-              <Cloud className="w-3.5 h-3.5 text-emerald-600 fill-emerald-500 shrink-0" />
-              <span className="hidden xs:inline">Supabase</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            </button>
+            {/* Inline Rename Box with instant automatic saving */}
+            {isRenamingAccount && (
+              <div className="pt-2 border-t border-slate-100 flex items-center gap-2 animate-in fade-in">
+                <input
+                  id="input-account-rename-name"
+                  type="text"
+                  value={accountRenameText}
+                  onChange={(e) => {
+                    setAccountRenameText(e.target.value);
+                    handleAutoSaveAccountName(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleAutoSaveAccountName(accountRenameText);
+                      setIsRenamingAccount(false);
+                    }
+                  }}
+                  placeholder="Enter new business / store name"
+                  className="flex-1 px-3 py-1.5 bg-slate-50 border border-emerald-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400 rounded-xl text-xs font-bold text-slate-800"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleAutoSaveAccountName(accountRenameText);
+                    setIsRenamingAccount(false);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-xs transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                >
+                  <Check className="w-3 h-3 stroke-[3]" />
+                  <span>Done</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -434,9 +539,7 @@ export default function App() {
                 Soundbox Alert
               </p>
               <p className="text-sm font-extrabold text-white">
-                {config.language === 'hi'
-                  ? `₹${paymentSuccessToast.amount} प्राप्त हुए`
-                  : `Payment of ₹${paymentSuccessToast.amount} Received`}
+                Payment of ₹{paymentSuccessToast.amount} Received
               </p>
             </div>
           </div>

@@ -144,7 +144,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             Instant UPI Portal
           </h1>
           <p className="text-sm font-medium text-slate-500 mt-0.5">
-            Customer Registration, Merchant Terminal & Admin Panel
+            Instant UPI Payment Terminal
           </p>
         </div>
 
@@ -223,7 +223,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     autoComplete="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="demo11 (Admin) or customer email"
+                    placeholder="Enter email or username"
                     className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white focus:outline-none rounded-xl text-sm font-semibold text-slate-900 transition-colors placeholder:text-slate-400"
                     required
                   />
@@ -279,7 +279,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     ? 'Verifying credentials...'
                     : username.toLowerCase() === 'demo11'
                     ? 'Sign In to Admin Panel'
-                    : 'Sign In to Portal'}
+                    : 'Sign In'}
                 </span>
                 <ArrowRight className="w-4 h-4" />
               </button>
