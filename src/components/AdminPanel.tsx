@@ -45,6 +45,7 @@ import {
   X,
   Share2,
   CheckCheck,
+  Download,
 } from 'lucide-react';
 import { MerchantConfig, PresetAmount, RegisteredUser, ValidityPlan } from '../types';
 import {
@@ -205,28 +206,90 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  const handleCopySql = () => {
-    const sql = `-- Supabase Table Schema for Merchant QR Config
-create table if not exists merchant_config (
+  const FULL_DATABASE_SQL = `-- ==============================================================================
+-- 1. USERS & VALIDITY PACKAGES TABLE (1 Month ₹500, 1 Year ₹2999, etc.)
+-- ==============================================================================
+create table if not exists users (
   id text primary key,
+  name text not null,
+  email text unique not null,
+  password text not null,
+  phone text,
+  business_name text,
+  role text default 'customer' check (role in ('admin', 'customer', 'merchant')),
+  status text default 'pending' check (status in ('pending', 'active', 'rejected')),
+  validity_plan text default '1_month' check (validity_plan in ('1_month', '3_months', '6_months', '1_year', 'lifetime')),
+  plan_price numeric default 500,
+  valid_from timestamptz default now(),
+  valid_until timestamptz not null,
+  registered_at timestamptz default now(),
+  created_at timestamptz default now()
+);
+
+-- ==============================================================================
+-- 2. MERCHANT & SOUNDBOX QR CONFIGURATION TABLE
+-- ==============================================================================
+create table if not exists merchant_config (
+  id text primary key default 'default_merchant',
   store_name text,
   upi_id text,
-  extra_percentage numeric,
-  is_extra_enabled boolean,
-  currency text,
-  note text,
-  soundbox_voice boolean,
-  language text,
+  extra_percentage numeric default 2,
+  is_extra_enabled boolean default true,
+  currency text default 'INR',
+  note text default 'Bill Payment',
+  soundbox_voice boolean default true,
+  language text default 'en',
   updated_at timestamptz default now()
 );
 
--- Row Level Security & Public policy
+-- ==============================================================================
+-- 3. TRANSACTIONS & BILL PAYMENTS TABLE
+-- ==============================================================================
+create table if not exists transactions (
+  id uuid primary key default gen_random_uuid(),
+  user_id text,
+  amount numeric not null,
+  extra_percentage numeric default 0,
+  final_amount numeric not null,
+  customer_name text,
+  customer_vpa text,
+  status text default 'completed' check (status in ('pending', 'completed', 'failed')),
+  created_at timestamptz default now()
+);
+
+-- ==============================================================================
+-- 4. ROW LEVEL SECURITY (RLS) POLICIES
+-- ==============================================================================
+alter table users enable row level security;
+create policy "Allow all access to users" on users for all using (true) with check (true);
+
 alter table merchant_config enable row level security;
 create policy "Allow all access to merchant_config" on merchant_config for all using (true) with check (true);
+
+alter table transactions enable row level security;
+create policy "Allow all access to transactions" on transactions for all using (true) with check (true);
 `;
-    navigator.clipboard.writeText(sql);
+
+  const handleCopySql = () => {
+    navigator.clipboard.writeText(FULL_DATABASE_SQL);
     setCopiedSql(true);
     setTimeout(() => setCopiedSql(false), 2000);
+  };
+
+  const handleDownloadSql = () => {
+    try {
+      const blob = new Blob([FULL_DATABASE_SQL], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'upi_payment_schema.sql';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Failed to download SQL file', e);
+    }
   };
 
   const handleTestVoice = () => {
@@ -1578,6 +1641,16 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                 <span>{copiedSql ? 'SQL Schema Copied!' : 'Copy SQL Table Schema'}</span>
               </button>
 
+              <button
+                type="button"
+                onClick={handleDownloadSql}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 font-extrabold text-xs transition-all cursor-pointer border border-slate-300 shadow-2xs"
+                title="Download .sql database migration script"
+              >
+                <Download className="w-4 h-4 text-slate-600" />
+                <span>Download .sql File</span>
+              </button>
+
               {syncStatus && (
                 <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
                   {syncStatus}
@@ -1588,22 +1661,11 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
             {/* SQL Terminal Box */}
             <div className="bg-slate-950 rounded-2xl p-4 border border-slate-800 font-mono text-xs text-slate-300 overflow-x-auto shadow-inner">
               <div className="flex items-center justify-between text-slate-500 font-bold mb-2 pb-2 border-b border-slate-800">
-                <span>-- Supabase SQL Editor Script</span>
+                <span>-- Supabase & Cloud SQL PostgreSQL Migration Script</span>
                 <span className="text-[10px] text-emerald-400">PostgreSQL</span>
               </div>
-              <pre className="text-emerald-400 leading-relaxed">
-{`CREATE TABLE merchant_config (
-  id TEXT PRIMARY KEY,
-  store_name TEXT,
-  upi_id TEXT,
-  extra_percentage NUMERIC,
-  is_extra_enabled BOOLEAN,
-  currency TEXT,
-  note TEXT,
-  soundbox_voice BOOLEAN,
-  language TEXT,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);`}
+              <pre className="text-emerald-400 leading-relaxed whitespace-pre font-mono text-[11px]">
+{FULL_DATABASE_SQL}
               </pre>
             </div>
           </div>

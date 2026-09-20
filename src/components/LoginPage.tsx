@@ -39,6 +39,58 @@ const PACKAGES: {
 const SAVED_CREDENTIALS_KEY = 'upi_saved_login_credentials_v1';
 const REMEMBER_PREF_KEY = 'upi_remember_login_pref_v1';
 
+export const ADMIN_WHATSAPP_NUMBER = '918598912555';
+export const ADMIN_WHATSAPP_DISPLAY = '8598912555';
+
+export interface PendingActivationInfo {
+  name: string;
+  email: string;
+  planTitle: string;
+  planPrice: number;
+  phone?: string;
+  store?: string;
+}
+
+export function WhatsAppIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L0 24l6.335-1.662c1.746.953 3.71 1.456 5.711 1.457h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+    </svg>
+  );
+}
+
+export function buildAdminWhatsAppUrl(info: {
+  name: string;
+  email: string;
+  planTitle?: string;
+  planPrice?: number;
+  phone?: string;
+  store?: string;
+}): string {
+  const cleanName = info.name.replace(/\bfree\s*/gi, '').trim() || info.name;
+  const lines = [
+    `🔔 *NEW ACCOUNT ACTIVATION REQUEST*`,
+    ``,
+    `Hello Admin! Maine UPI app par naya account register kiya hai. Kripya mera account activate karein.`,
+    ``,
+    `👤 *Customer Name:* ${cleanName}`,
+    `📧 *Gmail / User ID:* ${info.email}`,
+    info.planTitle ? `📦 *Selected Package:* ${info.planTitle} (₹${info.planPrice || 500})` : '',
+    info.phone ? `📱 *Phone Number:* ${info.phone}` : '',
+    info.store ? `🏪 *Store / Business:* ${info.store}` : '',
+    ``,
+    `Admin Panel me jakar mera account Approve & Activate karein.`,
+    `Dhanyawaad!`,
+  ].filter(Boolean);
+
+  return `https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent(lines.join('\n'))}`;
+}
+
 interface LoginPageProps {
   onLoginSuccess: (user: string, role: UserRole) => void;
 }
@@ -119,6 +171,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingActivationInfo, setPendingActivationInfo] = useState<PendingActivationInfo | null>(null);
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,6 +212,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         onLoginSuccess(auth.user.email, auth.isAdmin ? 'admin' : auth.user.role);
       } else {
         setError(auth.error || 'Invalid username or password.');
+        if (auth.error?.includes('pending') || auth.error?.includes('Activation')) {
+          setPendingActivationInfo({
+            name: 'Customer',
+            email: trimmedUser,
+            planTitle: 'Account Validity',
+            planPrice: 500,
+          });
+        }
       }
     }, 250);
   };
@@ -203,8 +264,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       }
 
       const activePkg = PACKAGES.find((p) => p.id === selectedPlan) || PACKAGES[0];
+      setPendingActivationInfo({
+        name: regName.trim(),
+        email: regEmail.trim(),
+        planTitle: activePkg.title,
+        planPrice: activePkg.price,
+        phone: regPhone.trim(),
+        store: regStore.trim(),
+      });
       setSuccessMsg(
-        `Registration Submitted for ${regName}! Gmail (${regEmail}) account activation ke liye Admin Panel par bhej diya gaya hai (${activePkg.title} • ₹${activePkg.price}). Admin dwara activate hone ke baad aap login kar sakenge.`
+        `Registration Submitted! Gmail (${regEmail}) account activation ke liye Admin Panel par bhej diya gaya hai (${activePkg.title} • ₹${activePkg.price}). Admin dwara activate hone ke baad aap login kar sakenge.`
       );
 
       // Prepopulate login form and switch to login tab
@@ -294,17 +363,84 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
           {/* Error Message */}
           {error && (
-            <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-              <span>{error}</span>
+            <div className="mb-4 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold space-y-2.5 animate-in fade-in">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{error}</span>
+              </div>
+
+              {(error.toLowerCase().includes('pending') || error.toLowerCase().includes('activation')) && (
+                <div className="pt-1">
+                  <a
+                    href={buildAdminWhatsAppUrl(
+                      pendingActivationInfo || {
+                        name: 'Customer',
+                        email: username || 'User',
+                        planTitle: 'Account Validity',
+                        planPrice: 500,
+                      }
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 px-3 bg-[#25D366] hover:bg-[#1ebe5d] active:scale-[0.98] text-white font-extrabold text-xs rounded-xl shadow-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    <WhatsAppIcon className="w-4 h-4 text-white shrink-0" />
+                    <span>Admin WhatsApp Activation: 8598912555</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-white shrink-0" />
+                  </a>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Success Message */}
+          {/* Registration Success & WhatsApp Direct Action Card */}
           {successMsg && (
-            <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>{successMsg}</span>
+            <div className="mb-5 p-4 rounded-2xl bg-gradient-to-b from-emerald-50 via-teal-50/40 to-white border-2 border-emerald-400 shadow-sm space-y-3.5 animate-in fade-in">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-emerald-900">
+                    Registration Submitted • Pending Activation
+                  </h4>
+                  <p className="text-xs font-medium text-emerald-950 mt-1 leading-relaxed">
+                    {successMsg}
+                  </p>
+                </div>
+              </div>
+
+              {/* WhatsApp Notification Button for Admin 8598912555 */}
+              <div className="pt-0.5">
+                <a
+                  href={buildAdminWhatsAppUrl(
+                    pendingActivationInfo || {
+                      name: 'Customer',
+                      email: username || 'User',
+                      planTitle: '1 Month',
+                      planPrice: 500,
+                    }
+                  )}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 px-3.5 bg-[#25D366] hover:bg-[#1ebe5d] active:scale-[0.98] text-white font-black text-xs rounded-xl shadow-md shadow-emerald-700/20 flex items-center justify-between gap-2.5 transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                      <WhatsAppIcon className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
+                    </div>
+                    <div className="text-left min-w-0">
+                      <div className="text-xs font-black leading-tight truncate">
+                        Admin ko WhatsApp par Message Bhejein
+                      </div>
+                      <div className="text-[10px] text-emerald-100 font-bold leading-tight mt-0.5 truncate">
+                        WhatsApp: 8598912555 (1-Tap Activation Request)
+                      </div>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-white shrink-0 group-hover:translate-x-1 transition-transform" />
+                </a>
+              </div>
             </div>
           )}
 
