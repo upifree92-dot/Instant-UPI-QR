@@ -94,6 +94,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   );
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
+  const [copiedShortSql, setCopiedShortSql] = useState(false);
+  const [sqlViewMode, setSqlViewMode] = useState<'short' | 'full'>('short');
   const [pingLatency, setPingLatency] = useState<number | null>(null);
   const [isPinging, setIsPinging] = useState(false);
   const [cloudSyncing, setCloudSyncing] = useState(false);
@@ -223,8 +225,59 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     await saveServerConfig({ ...config, presets: updated });
   };
 
+  const SHORT_DATABASE_SQL = `-- ==============================================================================
+-- SHORT 1-CLICK SQL FOR SUPABASE (100% WORKING - COPY & RUN IN SQL EDITOR)
+-- ==============================================================================
+create table if not exists registered_users (
+  id text primary key,
+  name text not null,
+  email text unique not null,
+  password text not null,
+  phone text,
+  business_name text,
+  upi_id text,
+  extra_percentage numeric default 0,
+  is_extra_enabled boolean default false,
+  role text default 'customer',
+  status text default 'active',
+  validity_plan text default '1_month',
+  valid_from timestamptz default now(),
+  valid_until timestamptz,
+  registered_at timestamptz default now(),
+  is_notification_read boolean default true,
+  created_at timestamptz default now()
+);
+
+alter table registered_users enable row level security;
+drop policy if exists "allow_all_registered_users" on registered_users;
+create policy "allow_all_registered_users" on registered_users for all using (true) with check (true);
+`;
+
   const FULL_DATABASE_SQL = `-- ==============================================================================
--- 1. USERS & VALIDITY PACKAGES TABLE (1 Month ₹500, 1 Year ₹2999, etc.)
+-- 1. REGISTERED USERS TABLE (Cloud Sync for Mobile, PC, & Custom Domain omnipayelite.com)
+-- ==============================================================================
+create table if not exists registered_users (
+  id text primary key,
+  name text not null,
+  email text unique not null,
+  password text not null,
+  phone text,
+  business_name text,
+  upi_id text,
+  extra_percentage numeric default 0,
+  is_extra_enabled boolean default false,
+  role text default 'customer',
+  status text default 'active',
+  validity_plan text default '1_month',
+  valid_from timestamptz default now(),
+  valid_until timestamptz,
+  registered_at timestamptz default now(),
+  is_notification_read boolean default true,
+  created_at timestamptz default now()
+);
+
+-- ==============================================================================
+-- 2. LEGACY USERS TABLE (Fallback & Compatibility)
 -- ==============================================================================
 create table if not exists users (
   id text primary key,
@@ -233,18 +286,18 @@ create table if not exists users (
   password text not null,
   phone text,
   business_name text,
-  role text default 'customer' check (role in ('admin', 'customer', 'merchant')),
-  status text default 'pending' check (status in ('pending', 'active', 'rejected')),
-  validity_plan text default '1_month' check (validity_plan in ('1_month', '3_months', '6_months', '1_year', 'lifetime')),
+  role text default 'customer',
+  status text default 'active',
+  validity_plan text default '1_month',
   plan_price numeric default 500,
   valid_from timestamptz default now(),
-  valid_until timestamptz not null,
+  valid_until timestamptz,
   registered_at timestamptz default now(),
   created_at timestamptz default now()
 );
 
 -- ==============================================================================
--- 2. MERCHANT & SOUNDBOX QR CONFIGURATION TABLE
+-- 3. MERCHANT & SOUNDBOX QR CONFIGURATION TABLE
 -- ==============================================================================
 create table if not exists merchant_config (
   id text primary key default 'default_merchant',
@@ -260,7 +313,7 @@ create table if not exists merchant_config (
 );
 
 -- ==============================================================================
--- 3. TRANSACTIONS & BILL PAYMENTS TABLE
+-- 4. TRANSACTIONS & BILL PAYMENTS TABLE
 -- ==============================================================================
 create table if not exists transactions (
   id uuid primary key default gen_random_uuid(),
@@ -275,15 +328,22 @@ create table if not exists transactions (
 );
 
 -- ==============================================================================
--- 4. ROW LEVEL SECURITY (RLS) POLICIES
+-- 5. ROW LEVEL SECURITY (RLS) POLICIES & PERMISSIONS (100% Working)
 -- ==============================================================================
+alter table registered_users enable row level security;
+drop policy if exists "Allow all access to registered_users" on registered_users;
+create policy "Allow all access to registered_users" on registered_users for all using (true) with check (true);
+
 alter table users enable row level security;
+drop policy if exists "Allow all access to users" on users;
 create policy "Allow all access to users" on users for all using (true) with check (true);
 
 alter table merchant_config enable row level security;
+drop policy if exists "Allow all access to merchant_config" on merchant_config;
 create policy "Allow all access to merchant_config" on merchant_config for all using (true) with check (true);
 
 alter table transactions enable row level security;
+drop policy if exists "Allow all access to transactions" on transactions;
 create policy "Allow all access to transactions" on transactions for all using (true) with check (true);
 `;
 
@@ -291,6 +351,12 @@ create policy "Allow all access to transactions" on transactions for all using (
     navigator.clipboard.writeText(FULL_DATABASE_SQL);
     setCopiedSql(true);
     setTimeout(() => setCopiedSql(false), 2000);
+  };
+
+  const handleCopyShortSql = () => {
+    navigator.clipboard.writeText(SHORT_DATABASE_SQL);
+    setCopiedShortSql(true);
+    setTimeout(() => setCopiedShortSql(false), 2000);
   };
 
   const handleDownloadSql = () => {
@@ -1071,14 +1137,26 @@ create policy "Allow all access to transactions" on transactions for all using (
                   </p>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setShowAddCustomerModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-sm active:scale-95 transition-all cursor-pointer"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  <span>+ Register New Customer</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleManualSyncUsers}
+                    disabled={isSyncingUsers}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold text-xs rounded-xl transition-all cursor-pointer disabled:opacity-50 border border-slate-200"
+                    title="Force sync customer data from Supabase Cloud"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isSyncingUsers ? 'animate-spin text-emerald-600' : 'text-slate-600'}`} />
+                    <span>{isSyncingUsers ? 'Syncing...' : 'Cloud Sync'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCustomerModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-sm active:scale-95 transition-all cursor-pointer"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>+ Register New Customer</span>
+                  </button>
+                </div>
               </div>
 
               {/* Toast Banner */}
@@ -1980,22 +2058,16 @@ create policy "Allow all access to transactions" on transactions for all using (
             <div className="flex flex-wrap items-center gap-2.5 pt-1">
               <button
                 type="button"
-                onClick={async () => {
-                  setCloudSyncing(true);
-                  const ok = await saveMerchantConfigToCloud(formData);
-                  setCloudSyncing(false);
-                  setSyncStatus(ok ? 'Synced to Supabase!' : 'Sync failed');
-                  setTimeout(() => setSyncStatus(null), 2500);
-                }}
-                disabled={cloudSyncing}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs shadow-sm transition-all cursor-pointer disabled:opacity-60"
+                onClick={handleCopyShortSql}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black text-xs shadow-md transition-all cursor-pointer"
+                title="Copy the minimal, 100% working SQL code for Supabase"
               >
-                {cloudSyncing ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
+                {copiedShortSql ? (
+                  <Check className="w-4 h-4 text-white" />
                 ) : (
-                  <Cloud className="w-4 h-4" />
+                  <Sparkles className="w-4 h-4 text-amber-300" />
                 )}
-                <span>{cloudSyncing ? 'Syncing...' : 'Force Sync Config to Supabase'}</span>
+                <span>{copiedShortSql ? 'Short SQL Copied!' : '⚡ Copy Short SQL (1-Click)'}</span>
               </button>
 
               <button
@@ -2008,7 +2080,27 @@ create policy "Allow all access to transactions" on transactions for all using (
                 ) : (
                   <Copy className="w-4 h-4 text-slate-400" />
                 )}
-                <span>{copiedSql ? 'SQL Schema Copied!' : 'Copy SQL Table Schema'}</span>
+                <span>{copiedSql ? 'Full Schema Copied!' : 'Copy Full Schema'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setCloudSyncing(true);
+                  const ok = await saveMerchantConfigToCloud(formData);
+                  setCloudSyncing(false);
+                  setSyncStatus(ok ? 'Synced to Supabase!' : 'Sync failed');
+                  setTimeout(() => setSyncStatus(null), 2500);
+                }}
+                disabled={cloudSyncing}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 font-extrabold text-xs transition-all cursor-pointer border border-slate-300 disabled:opacity-60"
+              >
+                {cloudSyncing ? (
+                  <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" />
+                ) : (
+                  <Cloud className="w-4 h-4 text-emerald-600" />
+                )}
+                <span>{cloudSyncing ? 'Syncing...' : 'Force Sync Config'}</span>
               </button>
 
               <button
@@ -2018,7 +2110,7 @@ create policy "Allow all access to transactions" on transactions for all using (
                 title="Download .sql database migration script"
               >
                 <Download className="w-4 h-4 text-slate-600" />
-                <span>Download .sql File</span>
+                <span>Download .sql</span>
               </button>
 
               {syncStatus && (
@@ -2028,14 +2120,44 @@ create policy "Allow all access to transactions" on transactions for all using (
               )}
             </div>
 
+            {/* SQL View Mode Tabs */}
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setSqlViewMode('short')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                  sqlViewMode === 'short'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                ⚡ Short SQL (Recommended)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSqlViewMode('full')}
+                className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                  sqlViewMode === 'full'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Full Database Schema (All 4 Tables)
+              </button>
+            </div>
+
             {/* SQL Terminal Box */}
             <div className="bg-slate-950 rounded-2xl p-4 border border-slate-800 font-mono text-xs text-slate-300 overflow-x-auto shadow-inner">
               <div className="flex items-center justify-between text-slate-500 font-bold mb-2 pb-2 border-b border-slate-800">
-                <span>-- Supabase & Cloud SQL PostgreSQL Migration Script</span>
+                <span>
+                  {sqlViewMode === 'short'
+                    ? '-- Short 1-Click Supabase Table (Paste into Supabase SQL Editor)'
+                    : '-- Full Supabase & Cloud SQL PostgreSQL Migration Script'}
+                </span>
                 <span className="text-[10px] text-emerald-400">PostgreSQL</span>
               </div>
               <pre className="text-emerald-400 leading-relaxed whitespace-pre font-mono text-[11px]">
-{FULL_DATABASE_SQL}
+                {sqlViewMode === 'short' ? SHORT_DATABASE_SQL : FULL_DATABASE_SQL}
               </pre>
             </div>
           </div>

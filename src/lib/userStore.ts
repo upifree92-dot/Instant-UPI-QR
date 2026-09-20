@@ -1,4 +1,10 @@
 import { MerchantConfig, RegisteredUser, UserRole, ValidityPlan } from '../types';
+import {
+  fetchUsersFromCloud,
+  saveUserToCloud,
+  deleteUserFromCloud,
+  subscribeToCloudUsers,
+} from './supabase';
 
 const USERS_STORAGE_KEY = 'upi_registered_users_v4';
 const DELETED_USERS_KEY = 'upi_deleted_users_list_v1';
@@ -315,6 +321,45 @@ export function saveRegisteredUsers(users: RegisteredUser[]): void {
 }
 
 export async function syncWithServerUsers(): Promise<RegisteredUser[]> {
+  // 1. Live Cloud Sync via Supabase (Works everywhere across any mobile, PC, and network, including custom domains like omnipayelite.com)
+  try {
+    const cloudUsers = await fetchUsersFromCloud();
+    if (Array.isArray(cloudUsers) && cloudUsers.length > 0) {
+      const local = getRegisteredUsers();
+      const mergedMap = new Map<string, RegisteredUser>();
+
+      // Populate cloud users first
+      for (const cu of cloudUsers) {
+        if (cu.email) {
+          mergedMap.set(cu.email.toLowerCase().trim(), cu);
+        }
+      }
+
+      // If local has users not in cloud (e.g., created offline), push them up to Cloud
+      for (const lu of local) {
+        const clean = lu.email.toLowerCase().trim();
+        if (clean && !mergedMap.has(clean)) {
+          mergedMap.set(clean, lu);
+          saveUserToCloud(lu).catch(() => {});
+        }
+      }
+
+      // Always ensure Super Admin is included
+      if (!mergedMap.has('kgfilewala@gmail.com')) {
+        mergedMap.set('kgfilewala@gmail.com', DEFAULT_USERS[0]);
+        saveUserToCloud(DEFAULT_USERS[0]).catch(() => {});
+      }
+
+      const merged = Array.from(mergedMap.values());
+      localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(merged));
+      broadcastUsersUpdated({ type: 'users_synced', users: merged });
+      return merged;
+    }
+  } catch (err) {
+    console.warn('Supabase cloud users sync notice:', err);
+  }
+
+  // 2. Secondary sync with backend server API if available
   try {
     const localUsers = getRegisteredUsers();
     const res = await fetch('/api/users/sync', {
@@ -326,6 +371,10 @@ export async function syncWithServerUsers(): Promise<RegisteredUser[]> {
       const data = await res.json();
       if (data.success && Array.isArray(data.users) && data.users.length > 0) {
         localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(data.users));
+        // Also persist server users into Supabase Cloud
+        for (const u of data.users) {
+          saveUserToCloud(u).catch(() => {});
+        }
         return data.users;
       }
     }
@@ -347,6 +396,7 @@ type SuperSyncListener = (payload: {
 const listeners: Set<SuperSyncListener> = new Set();
 let globalEventSource: EventSource | null = null;
 let isConnecting = false;
+let globalSupabaseUnsub: (() => void) | null = null;
 
 export function subscribeToSuperAutoConnect(listener: SuperSyncListener): () => void {
   listeners.add(listener);
@@ -358,7 +408,31 @@ export function subscribeToSuperAutoConnect(listener: SuperSyncListener): () => 
 }
 
 export function initSuperAutoConnect(): void {
-  if (typeof window === 'undefined' || !('EventSource' in window)) return;
+  if (typeof window === 'undefined') return;
+
+  // Supabase Realtime subscription for cross-device & cross-network sync
+  if (!globalSupabaseUnsub) {
+    try {
+      globalSupabaseUnsub = subscribeToCloudUsers(async () => {
+        try {
+          const fresh = await fetchUsersFromCloud();
+          if (Array.isArray(fresh) && fresh.length > 0) {
+            localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(fresh));
+            broadcastUsersUpdated({ type: 'users_synced', users: fresh });
+            for (const fn of listeners) {
+              try {
+                fn({ type: 'users_synced', users: fresh });
+              } catch {}
+            }
+          }
+        } catch (e) {
+          console.warn('Supabase realtime listener sync notice:', e);
+        }
+      });
+    } catch {}
+  }
+
+  if (!('EventSource' in window)) return;
   if (globalEventSource && globalEventSource.readyState !== EventSource.CLOSED) return;
   if (isConnecting) return;
 
@@ -499,6 +573,7 @@ export function updateUserAccountName(
     users[idx].name = newCustomerName.trim();
   }
   saveRegisteredUsers(users);
+  saveUserToCloud(users[idx]).catch(() => {});
   return { success: true, user: users[idx] };
 }
 
@@ -557,6 +632,7 @@ export function saveUserCustomConfig(
       users[idx].isExtraEnabled = Boolean(newConfig.isExtraEnabled);
     }
     saveRegisteredUsers(users);
+    saveUserToCloud(users[idx]).catch(() => {});
 
     // 3. Sync to server API so other PCs get this custom configuration immediately
     try {
@@ -663,6 +739,11 @@ export function registerCustomer(params: {
   const updated = [newUser, ...users];
   saveRegisteredUsers(updated);
 
+  // Instantly push to Supabase Cloud (syncs across all networks, devices, and custom domains)
+  saveUserToCloud(newUser).catch((err) => {
+    console.warn('Supabase cloud register sync notice:', err);
+  });
+
   // Send to backend server API asynchronously so Admin Panel on any device connects immediately
   try {
     fetch('/api/users/register', {
@@ -716,6 +797,9 @@ export function updateUserPassword(
 
   users[idx].password = cleanPass;
   saveRegisteredUsers(users);
+
+  // Sync with Supabase Cloud
+  saveUserToCloud(users[idx]).catch(() => {});
 
   // Sync with backend API
   try {
@@ -895,6 +979,10 @@ export function updateUserValidity(
   };
 
   saveRegisteredUsers(users);
+
+  // Sync with Supabase Cloud
+  saveUserToCloud(users[index]).catch(() => {});
+
   return { success: true, user: users[index] };
 }
 
@@ -930,6 +1018,9 @@ export function updateUserStatus(
     isNotificationRead: true,
   };
   saveRegisteredUsers(users);
+
+  // Sync with Supabase Cloud
+  saveUserToCloud(users[index]).catch(() => {});
 
   // Sync to server API immediately
   try {
@@ -982,8 +1073,14 @@ export async function batchActivatePendingUsers(
     return u;
   });
 
-  if (count > 0) {
+    if (count > 0) {
     saveRegisteredUsers(updated);
+    // Push updated users to Supabase Cloud
+    for (const u of updated) {
+      if (u.status === 'active') {
+        saveUserToCloud(u).catch(() => {});
+      }
+    }
   }
 
   // 2. Call server batch activate API
@@ -1038,6 +1135,12 @@ export function deleteRegisteredUser(userId: string): boolean {
         u.email.toLowerCase() !== target.email.toLowerCase()
     );
     saveRegisteredUsers(filtered);
+
+    // Delete from Supabase Cloud
+    deleteUserFromCloud(target.id).catch(() => {});
+    if (target.email) {
+      deleteUserFromCloud(target.email).catch(() => {});
+    }
 
     // Call server API to delete from server storage
     try {
