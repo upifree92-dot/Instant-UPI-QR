@@ -7,6 +7,58 @@ const PORT = 3000;
 const DATA_DIR = path.join(process.cwd(), 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const DELETED_FILE = path.join(DATA_DIR, 'deleted_users.json');
+const CONFIG_FILE = path.join(DATA_DIR, 'config.json');
+
+const DEFAULT_SERVER_CONFIG = {
+  storeName: 'Sharma General Store',
+  upiId: 'sharmastore@okhdfcbank',
+  extraPercentage: 2,
+  isExtraEnabled: true,
+  currency: 'INR',
+  note: 'Bill Payment',
+  soundboxVoice: true,
+  language: 'en',
+  presets: [50, 100, 200, 500, 1000, 2000],
+  updatedAt: new Date().toISOString(),
+};
+
+function loadConfig() {
+  try {
+    if (fs.existsSync(CONFIG_FILE)) {
+      const content = fs.readFileSync(CONFIG_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          ...DEFAULT_SERVER_CONFIG,
+          ...parsed,
+          presets:
+            Array.isArray(parsed.presets) && parsed.presets.length > 0
+              ? parsed.presets
+              : DEFAULT_SERVER_CONFIG.presets,
+        };
+      }
+    }
+  } catch (err) {
+    console.error('Failed to read config file:', err);
+  }
+  saveConfig(DEFAULT_SERVER_CONFIG);
+  return DEFAULT_SERVER_CONFIG;
+}
+
+function saveConfig(cfg: any) {
+  try {
+    const merged = {
+      ...DEFAULT_SERVER_CONFIG,
+      ...cfg,
+      updatedAt: new Date().toISOString(),
+    };
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(merged, null, 2), 'utf-8');
+    return merged;
+  } catch (err) {
+    console.error('Failed to write config file:', err);
+    return cfg;
+  }
+}
 
 // Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) {
@@ -185,7 +237,7 @@ async function startServer() {
     res.json({ status: 'ok', time: new Date().toISOString() });
   });
 
-  // Real-time Event Stream (Server-Sent Events)
+  // Real-time Event Stream (Server-Sent Events) - Instant sync for any connected PC
   app.get('/api/users/stream', (req, res) => {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -193,12 +245,72 @@ async function startServer() {
       'Connection': 'keep-alive',
       'X-Accel-Buffering': 'no',
     });
-    res.write(`event: connected\ndata: ${JSON.stringify({ time: Date.now(), totalUsers: loadUsers().length })}\n\n`);
+    const currentConfig = loadConfig();
+    const currentUsers = loadUsers();
+    res.write(
+      `event: connected\ndata: ${JSON.stringify({
+        time: Date.now(),
+        totalUsers: currentUsers.length,
+        config: currentConfig,
+        users: currentUsers,
+      })}\n\n`
+    );
     sseClients.add(res);
 
     req.on('close', () => {
       sseClients.delete(res);
     });
+  });
+
+  // Get current global/admin merchant configuration and presets
+  app.get('/api/config', (req, res) => {
+    const config = loadConfig();
+    res.json({ success: true, config });
+  });
+
+  // Update global/admin merchant configuration and presets (Instantly syncs to all PCs via SSE)
+  app.post('/api/config', (req, res) => {
+    try {
+      const current = loadConfig();
+      const updated = saveConfig({ ...current, ...req.body });
+      console.log(`[API] Merchant config & presets updated: ${updated.storeName} (${updated.upiId})`);
+      broadcastSse('config_updated', { config: updated });
+      res.json({ success: true, config: updated });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Save customer's custom profile & store settings (so they persist across any PC)
+  app.post('/api/users/custom-config', (req, res) => {
+    try {
+      const { emailOrId, config: userConfig } = req.body;
+      if (!emailOrId || !userConfig) {
+        return res.status(400).json({ success: false, error: 'Missing emailOrId or config' });
+      }
+      const clean = (emailOrId || '').trim().toLowerCase();
+      const users = loadUsers();
+      const idx = users.findIndex(
+        (u) => u.id === emailOrId || u.email?.toLowerCase() === clean
+      );
+      if (idx !== -1) {
+        if (userConfig.storeName) users[idx].businessName = userConfig.storeName;
+        if (userConfig.upiId) users[idx].upiId = userConfig.upiId;
+        if (userConfig.extraPercentage !== undefined) {
+          users[idx].extraPercentage = userConfig.extraPercentage;
+        }
+        if (userConfig.isExtraEnabled !== undefined) {
+          users[idx].isExtraEnabled = userConfig.isExtraEnabled;
+        }
+        saveUsers(users);
+        console.log(`[API] Saved custom merchant config for user ${clean}`);
+        broadcastSse('user_updated', { user: users[idx] });
+        return res.json({ success: true, user: users[idx] });
+      }
+      return res.status(404).json({ success: false, error: 'User not found' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
   });
 
   // Get all registered users (used by Admin Panel and Client Sync)

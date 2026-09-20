@@ -30,6 +30,7 @@ export interface MerchantConfig {
   note: string;
   soundboxVoice: boolean;
   language: 'hi' | 'en';
+  presets?: number[];
 }
 
 export interface PresetAmount {

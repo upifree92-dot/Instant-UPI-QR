@@ -21,7 +21,10 @@ export const AmountSection: React.FC<AmountSectionProps> = ({
   baseAmount,
   onAmountChange,
 }) => {
-  const [activePresets] = React.useState<number[]>(() => {
+  const activePresets = React.useMemo<number[]>(() => {
+    if (Array.isArray(config.presets) && config.presets.length > 0) {
+      return config.presets;
+    }
     try {
       const saved = localStorage.getItem('upi_merchant_presets_list');
       if (saved) {
@@ -32,7 +35,7 @@ export const AmountSection: React.FC<AmountSectionProps> = ({
       // fallback
     }
     return FALLBACK_PRESETS;
-  });
+  }, [config.presets]);
 
   // Compute calculated QR amount for any base amount
   const calculateQrAmount = (base: number): number => {

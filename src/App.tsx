@@ -25,6 +25,10 @@ import {
   updateUserAccountName,
   getUserSavedConfig,
   saveUserCustomConfig,
+  syncWithServerUsers,
+  fetchServerConfig,
+  saveServerConfig,
+  subscribeToSuperAutoConnect,
 } from './lib/userStore';
 
 const STORAGE_KEY = 'upi_merchant_config_v1';
@@ -219,17 +223,22 @@ export default function App() {
     setBaseAmount(0);
   };
 
-  // Fetch latest config from Supabase Cloud on startup (protects user's saved config)
+  // Fetch latest config from Server & Supabase on startup, and sync real-time across PCs
   useEffect(() => {
-    fetchMerchantConfigFromCloud().then((cloudConfig) => {
-      if (cloudConfig && (cloudConfig.storeName || cloudConfig.upiId)) {
+    // 1. Fetch server users immediately on startup so any PC has full database
+    syncWithServerUsers().then(() => {
+      setUserStoreVersion((v) => v + 1);
+    });
+
+    // 2. Fetch server config (storeName, upiId, extra fee %, presets)
+    fetchServerConfig().then((serverConfig) => {
+      if (serverConfig && (serverConfig.storeName || serverConfig.upiId)) {
         setConfig((prev) => {
           const userSaved = currentUserEmail ? getUserSavedConfig(currentUserEmail) : null;
           if (userSaved && (userSaved.storeName || userSaved.upiId)) {
-            // Preserve user's personalized saved details
             return {
               ...prev,
-              ...cloudConfig,
+              ...serverConfig,
               storeName: userSaved.storeName || prev.storeName,
               upiId: userSaved.upiId || prev.upiId,
               extraPercentage:
@@ -244,16 +253,66 @@ export default function App() {
           }
           return {
             ...prev,
-            ...cloudConfig,
-            storeName: cloudConfig.storeName || prev.storeName,
-            upiId: cloudConfig.upiId || prev.upiId,
+            ...serverConfig,
           };
         });
       }
     });
+
+    // 3. Fallback check to Supabase Cloud
+    fetchMerchantConfigFromCloud().then((cloudConfig) => {
+      if (cloudConfig && (cloudConfig.storeName || cloudConfig.upiId)) {
+        setConfig((prev) => {
+          const userSaved = currentUserEmail ? getUserSavedConfig(currentUserEmail) : null;
+          if (userSaved && (userSaved.storeName || userSaved.upiId)) {
+            return {
+              ...prev,
+              ...cloudConfig,
+              storeName: userSaved.storeName || prev.storeName,
+              upiId: userSaved.upiId || prev.upiId,
+            };
+          }
+          return {
+            ...prev,
+            ...cloudConfig,
+          };
+        });
+      }
+    });
+
+    // 4. Real-time Auto Connect: Instantly sync data whenever PC 1 (or any PC) updates
+    const unsubscribe = subscribeToSuperAutoConnect((payload) => {
+      if (payload.type === 'config_updated' && payload.config) {
+        setConfig((prev) => {
+          const userSaved = currentUserEmail ? getUserSavedConfig(currentUserEmail) : null;
+          return {
+            ...prev,
+            ...payload.config,
+            ...(userSaved?.storeName ? { storeName: userSaved.storeName } : {}),
+            ...(userSaved?.upiId ? { upiId: userSaved.upiId } : {}),
+          };
+        });
+      } else if (payload.type === 'connected') {
+        if (payload.config) {
+          setConfig((prev) => ({ ...prev, ...payload.config }));
+        }
+        setUserStoreVersion((v) => v + 1);
+      } else if (
+        payload.type === 'users_synced' ||
+        payload.type === 'user_updated' ||
+        payload.type === 'user_registered' ||
+        payload.type === 'user_deleted'
+      ) {
+        setUserStoreVersion((v) => v + 1);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, [currentUserEmail]);
 
-  // Save config to localStorage immediately & whenever updated, and sync to user profile & Supabase Cloud
+  // Save config to server & localStorage, and broadcast to all connected PCs
   const handleSaveConfig = (newConfig: MerchantConfig) => {
     const updated: MerchantConfig = {
       ...newConfig,
@@ -264,7 +323,7 @@ export default function App() {
     };
     setConfig(updated);
 
-    // 1. Permanently bind and save to currentUserEmail ID
+    // 1. Permanently bind and save to currentUserEmail ID (syncs to server)
     if (currentUserEmail) {
       saveUserCustomConfig(currentUserEmail, updated);
       updateUserAccountName(currentUserEmail, updated.storeName, updated.storeName);
@@ -278,7 +337,11 @@ export default function App() {
     } catch (e) {
       console.error('Failed to write to localStorage', e);
     }
-    // Background cloud sync to Supabase
+
+    // 2. Synchronize to Server (Pushes immediately to all other PCs & devices via SSE)
+    saveServerConfig(updated);
+
+    // 3. Background cloud sync to Supabase
     saveMerchantConfigToCloud(updated);
   };
 

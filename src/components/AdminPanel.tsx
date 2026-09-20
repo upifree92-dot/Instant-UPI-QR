@@ -70,6 +70,7 @@ import {
   updateUserPassword,
   syncWithServerUsers,
   subscribeToSuperAutoConnect,
+  saveServerConfig,
 } from '../lib/userStore';
 
 interface AdminPanelProps {
@@ -137,8 +138,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [addError, setAddError] = useState<string | null>(null);
   const [addSuccess, setAddSuccess] = useState<string | null>(null);
 
-  // Editable presets stored in localStorage
+  // Editable presets stored on Server & synchronized across all PCs
   const [presets, setPresets] = useState<number[]>(() => {
+    if (config.presets && config.presets.length > 0) return config.presets;
     try {
       const saved = localStorage.getItem('upi_merchant_presets_list');
       if (saved) return JSON.parse(saved);
@@ -151,6 +153,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   useEffect(() => {
     setFormData({ ...config });
+    if (config.presets && config.presets.length > 0) {
+      setPresets(config.presets);
+    }
   }, [config]);
 
   // Test Supabase connectivity on mount
@@ -171,15 +176,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       ...formData,
       storeName: formData.storeName.trim() || config.storeName,
       upiId: formData.upiId.trim() || config.upiId,
+      presets,
     };
     onSaveConfig(updated);
     setSaveSuccess(true);
 
-    // Also sync to cloud
+    // Sync to Server (Instant cross-PC synchronization via SSE)
     setCloudSyncing(true);
-    const cloudOk = await saveMerchantConfigToCloud(updated);
+    const serverOk = await saveServerConfig(updated);
+    // Also sync to Supabase Cloud if credentials active
+    saveMerchantConfigToCloud(updated).catch(() => {});
     setCloudSyncing(false);
-    setSyncStatus(cloudOk ? 'Synced to Supabase Cloud' : 'Saved in local storage');
+    setSyncStatus(serverOk ? 'Synced across all devices & PCs!' : 'Saved in local storage');
 
     setTimeout(() => {
       setSaveSuccess(false);
@@ -187,7 +195,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }, 3000);
   };
 
-  const handleAddPreset = () => {
+  const handleAddPreset = async () => {
     const val = parseInt(newPresetVal, 10);
     if (!isNaN(val) && val > 0 && !presets.includes(val)) {
       const updated = [...presets, val].sort((a, b) => a - b);
@@ -198,10 +206,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         // ignore
       }
       setNewPresetVal('');
+      // Immediately push updated presets to server so PC 2 updates in real-time
+      await saveServerConfig({ ...config, presets: updated });
     }
   };
 
-  const handleRemovePreset = (val: number) => {
+  const handleRemovePreset = async (val: number) => {
     const updated = presets.filter((p) => p !== val);
     setPresets(updated);
     try {
@@ -209,6 +219,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     } catch {
       // ignore
     }
+    // Immediately push updated presets to server so PC 2 updates in real-time
+    await saveServerConfig({ ...config, presets: updated });
   };
 
   const FULL_DATABASE_SQL = `-- ==============================================================================

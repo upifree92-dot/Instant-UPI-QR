@@ -338,7 +338,12 @@ export async function syncWithServerUsers(): Promise<RegisteredUser[]> {
 // ==============================================================================
 // SUPER AUTOMATIC REAL-TIME AUTO CONNECT ENGINE (Server-Sent Events & Cross-Tab)
 // ==============================================================================
-type SuperSyncListener = (payload: { type: string; user?: RegisteredUser; users?: RegisteredUser[] }) => void;
+type SuperSyncListener = (payload: {
+  type: string;
+  user?: RegisteredUser;
+  users?: RegisteredUser[];
+  config?: MerchantConfig;
+}) => void;
 const listeners: Set<SuperSyncListener> = new Set();
 let globalEventSource: EventSource | null = null;
 let isConnecting = false;
@@ -372,12 +377,26 @@ export function initSuperAutoConnect(): void {
       broadcastUsersUpdated({ type, ...data });
       for (const fn of listeners) {
         try {
-          fn({ type, user: data?.user, users: data?.users });
+          fn({ type, user: data?.user, users: data?.users, config: data?.config });
         } catch (e) {
           console.error('Super Auto Connect listener error:', e);
         }
       }
     };
+
+    es.addEventListener('connected', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        notify('connected', data);
+      } catch {}
+    });
+
+    es.addEventListener('config_updated', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        notify('config_updated', data);
+      } catch {}
+    });
 
     es.addEventListener('user_registered', (e) => {
       try {
@@ -419,6 +438,34 @@ export function initSuperAutoConnect(): void {
     };
   } catch (err) {
     isConnecting = false;
+  }
+}
+
+// Fetch global merchant config & presets from server
+export async function fetchServerConfig(): Promise<MerchantConfig | null> {
+  try {
+    const res = await fetch('/api/config');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.config) {
+        return data.config;
+      }
+    }
+  } catch {}
+  return null;
+}
+
+// Save global merchant config & presets to server (Syncs immediately to all other PCs)
+export async function saveServerConfig(config: MerchantConfig): Promise<boolean> {
+  try {
+    const res = await fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -510,6 +557,15 @@ export function saveUserCustomConfig(
       users[idx].isExtraEnabled = Boolean(newConfig.isExtraEnabled);
     }
     saveRegisteredUsers(users);
+
+    // 3. Sync to server API so other PCs get this custom configuration immediately
+    try {
+      fetch('/api/users/custom-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emailOrId: clean, config: newConfig }),
+      }).catch(() => {});
+    } catch {}
   }
 }
 
