@@ -986,19 +986,6 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
               </div>
             </div>
 
-            {/* One-Page Customer Directory Notice */}
-            <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2.5 text-emerald-950 font-bold">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-                <span>
-                  <strong>One-Page Directory & Password Control:</strong> Only Admin can change user passwords. Click <strong>Password</strong> or <strong>Full Details</strong> on any customer to view credentials, set passwords, or extend validity.
-                </span>
-              </div>
-              <span className="text-[11px] font-extrabold text-emerald-800 bg-white px-2.5 py-1 rounded-lg border border-emerald-300 shrink-0">
-                {filteredUsers.length} Customers Listed
-              </span>
-            </div>
-
             {/* ONE-PAGE CUSTOMER DIRECTORY: TABLE VIEW (DESKTOP & TABLET) */}
             <div className="hidden md:block bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
               {filteredUsers.length === 0 ? (

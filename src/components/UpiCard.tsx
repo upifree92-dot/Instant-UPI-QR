@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { ShieldCheck, Pencil } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { MerchantConfig } from '../types';
 import { AcceptedUpiApps } from './AcceptedUpiApps';
 
@@ -58,36 +58,12 @@ export const UpiCard: React.FC<UpiCardProps> = ({
 
       {/* Store Information */}
       <div className="text-center mb-3 px-2">
-        <div className="flex items-center justify-center gap-1.5">
-          <h2 className="font-bold text-[19px] sm:text-xl text-slate-900 leading-tight">
-            {config.storeName || 'Sharma General Store'}
-          </h2>
-          {onOpenSettings && (
-            <button
-              id="btn-edit-store-name"
-              type="button"
-              onClick={onOpenSettings}
-              title="Edit Store Name, UPI ID & Surcharge %"
-              className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-emerald-700 transition-colors cursor-pointer"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+        <h2 className="font-bold text-[19px] sm:text-xl text-slate-900 leading-tight">
+          {config.storeName || 'Sharma General Store'}
+        </h2>
         <p className="text-slate-500 text-[13px] sm:text-sm mt-0.5 tracking-tight font-medium select-all">
           {config.upiId || 'sharmastore@okhdfcbank'}
         </p>
-
-        {config.storeName === 'Sharma General Store' && onOpenSettings && (
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold rounded-full transition-all cursor-pointer shadow-2xs"
-          >
-            <Pencil className="w-3 h-3 text-amber-700" />
-            <span>Set Your Store Name & UPI ID</span>
-          </button>
-        )}
       </div>
 
       {/* QR Code Container matching screenshot */}
