@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS public.registered_users (
     phone TEXT,
     business_name TEXT,
     role TEXT NOT NULL DEFAULT 'customer' CHECK (role IN ('customer', 'admin')),
-    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('active', 'pending', 'expired')),
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('active', 'pending', 'expired', 'rejected')),
     validity_plan TEXT DEFAULT '1_month',
     valid_until TIMESTAMPTZ,
     valid_from TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()),
@@ -114,6 +114,21 @@ INSERT INTO public.registered_users (
     is_notification_read
 ) VALUES 
 (
+    'admin_kgfilewala',
+    'Super Admin',
+    'kgfilewala@gmail.com',
+    'bbbb@9090',
+    '8598912555',
+    'UPI Master Admin',
+    'admin',
+    'active',
+    'lifetime',
+    TIMEZONE('utc', NOW() + INTERVAL '10 years'),
+    TIMEZONE('utc', NOW()),
+    TIMEZONE('utc', NOW()),
+    true
+),
+(
     'admin_main',
     'Super Admin',
     'admin@upi.com',
@@ -121,6 +136,21 @@ INSERT INTO public.registered_users (
     '8598912555',
     'UPI Master System',
     'admin',
+    'active',
+    'lifetime',
+    TIMEZONE('utc', NOW() + INTERVAL '10 years'),
+    TIMEZONE('utc', NOW()),
+    TIMEZONE('utc', NOW()),
+    true
+),
+(
+    'user_demo9090',
+    'Demo User',
+    'demo9090',
+    'demo9090',
+    '9090909090',
+    'Demo Store',
+    'customer',
     'active',
     'lifetime',
     TIMEZONE('utc', NOW() + INTERVAL '10 years'),
