@@ -1,9 +1,9 @@
 import React from 'react';
-import { Settings, RefreshCw, LogOut, QrCode, ShieldCheck } from 'lucide-react';
+import { Settings, LogOut, QrCode, ShieldCheck } from 'lucide-react';
 
 interface HeaderProps {
   onOpenSettings: () => void;
-  onReset: () => void;
+  onReset?: () => void;
   onExit: () => void;
   language?: 'hi' | 'en';
   onToggleLanguage?: () => void;
@@ -62,16 +62,6 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <Settings className="w-4 h-4 stroke-[2.2] text-emerald-700 animate-spin-slow" />
           <span>Settings</span>
-        </button>
-
-        <button
-          id="btn-refresh"
-          type="button"
-          onClick={onReset}
-          title="Reset to 0"
-          className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:bg-slate-50 active:scale-95 transition-all shadow-xs flex items-center justify-center cursor-pointer"
-        >
-          <RefreshCw className="w-4 h-4 stroke-[2]" />
         </button>
 
         <button

@@ -343,80 +343,82 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
             />
           </div>
 
-          {/* Supabase Cloud Database Integration */}
-          <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-sm space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-                  <Database className="w-4 h-4" />
+          {/* Supabase Cloud Database Integration - Admin only, hidden for customer */}
+          {isAdmin && (
+            <div className="bg-slate-900 text-white rounded-2xl p-4 border border-slate-800 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                    <Database className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-xs text-white tracking-wide flex items-center gap-1.5">
+                      <span>Supabase Cloud Database</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-400 font-mono">
+                      Project ID: {SUPABASE_PROJECT_ID}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="font-extrabold text-xs text-white tracking-wide flex items-center gap-1.5">
-                    <span>Supabase Cloud Database</span>
-                  </h4>
-                  <p className="text-[11px] text-slate-400 font-mono">
-                    Project ID: {SUPABASE_PROJECT_ID}
-                  </p>
+
+                <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-full text-[11px] font-bold text-emerald-400">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Connected</span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-full text-[11px] font-bold text-emerald-400">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span>Connected</span>
-              </div>
-            </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Store Name, UPI ID aur settings aapke Supabase Cloud database ke sath permanently synced rehte hain.
+              </p>
 
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Store Name, UPI ID aur settings aapke Supabase Cloud database ke sath permanently synced rehte hain.
-            </p>
-
-            <div className="pt-1 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={handleSyncCloud}
-                disabled={cloudStatus.checking}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs transition-all cursor-pointer disabled:opacity-60"
-              >
-                {cloudStatus.checking ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                ) : cloudStatus.synced ? (
-                  <Check className="w-3.5 h-3.5 text-white" />
-                ) : (
-                  <Cloud className="w-3.5 h-3.5" />
-                )}
-                <span>{cloudStatus.synced ? 'Synced to Supabase!' : 'Sync to Cloud Now'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleCopySql}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium text-xs transition-all cursor-pointer"
-                title="Copy PostgreSQL table script for Supabase SQL Editor"
-              >
-                {copiedSql ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5 text-slate-400" />
-                )}
-                <span>{copiedSql ? 'SQL Copied!' : 'Copy SQL Schema'}</span>
-              </button>
-
-              {isAdmin && onOpenAdminPanel && (
+              <div className="pt-1 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenAdminPanel();
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-emerald-500/50 text-emerald-300 font-bold text-xs transition-all cursor-pointer"
-                  title="Switch to Admin Control Panel"
+                  onClick={handleSyncCloud}
+                  disabled={cloudStatus.checking}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs transition-all cursor-pointer disabled:opacity-60"
                 >
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Admin Panel</span>
+                  {cloudStatus.checking ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : cloudStatus.synced ? (
+                    <Check className="w-3.5 h-3.5 text-white" />
+                  ) : (
+                    <Cloud className="w-3.5 h-3.5" />
+                  )}
+                  <span>{cloudStatus.synced ? 'Synced to Supabase!' : 'Sync to Cloud Now'}</span>
                 </button>
-              )}
+
+                <button
+                  type="button"
+                  onClick={handleCopySql}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium text-xs transition-all cursor-pointer"
+                  title="Copy PostgreSQL table script for Supabase SQL Editor"
+                >
+                  {copiedSql ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-slate-400" />
+                  )}
+                  <span>{copiedSql ? 'SQL Copied!' : 'Copy SQL Schema'}</span>
+                </button>
+
+                {onOpenAdminPanel && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenAdminPanel();
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-emerald-500/50 text-emerald-300 font-bold text-xs transition-all cursor-pointer"
+                    title="Switch to Admin Control Panel"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Admin Panel</span>
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Form Actions */}
           <div className="flex items-center justify-between pt-3 border-t border-slate-100 gap-2">
