@@ -1,6 +1,27 @@
 import { MerchantConfig, RegisteredUser, UserRole, ValidityPlan } from '../types';
 
 const USERS_STORAGE_KEY = 'upi_registered_users_v4';
+const DELETED_USERS_KEY = 'upi_deleted_users_list_v1';
+
+export function getDeletedUserIds(): string[] {
+  try {
+    const raw = localStorage.getItem(DELETED_USERS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function unblacklistUser(identifier: string): void {
+  try {
+    const deleted = getDeletedUserIds();
+    const clean = identifier.trim().toLowerCase();
+    const filtered = deleted.filter((item) => item.toLowerCase() !== clean);
+    localStorage.setItem(DELETED_USERS_KEY, JSON.stringify(filtered));
+  } catch {
+    // ignore
+  }
+}
 
 export const VALIDITY_PLANS: {
   id: ValidityPlan;
@@ -185,6 +206,15 @@ export function getRegisteredUsers(): RegisteredUser[] {
             u.email !== 'demo@gmail.com' &&
             u.email.toLowerCase() !== 'demo11'
         );
+
+        const deletedList = getDeletedUserIds();
+        // Strictly filter out any user that was deleted by admin
+        cleaned = cleaned.filter(
+          (u) =>
+            !deletedList.includes(u.id) &&
+            !deletedList.includes(u.email.toLowerCase())
+        );
+
         // Ensure new admin user exists and has current password
         const adminIdx = cleaned.findIndex(
           (u) => u.email.toLowerCase() === 'kgfilewala@gmail.com'
@@ -200,30 +230,37 @@ export function getRegisteredUsers(): RegisteredUser[] {
           };
         }
 
-        // Ensure demo9090 user exists with password demo9090
-        const demoIdx = cleaned.findIndex(
-          (u) =>
-            u.email.toLowerCase() === 'demo9090' ||
-            u.id === 'user_demo9090'
-        );
-        if (demoIdx === -1) {
-          const demoUser = DEFAULT_USERS.find((u) => u.email === 'demo9090');
-          if (demoUser) cleaned.push(demoUser);
-        } else {
-          cleaned[demoIdx] = {
-            ...cleaned[demoIdx],
-            email: 'demo9090',
-            password: 'demo9090',
-            status: 'active',
-            validityPlan: 'lifetime',
-          };
+        // Ensure demo9090 user exists with password demo9090 (if not explicitly deleted)
+        if (!deletedList.includes('user_demo9090') && !deletedList.includes('demo9090')) {
+          const demoIdx = cleaned.findIndex(
+            (u) =>
+              u.email.toLowerCase() === 'demo9090' ||
+              u.id === 'user_demo9090'
+          );
+          if (demoIdx === -1) {
+            const demoUser = DEFAULT_USERS.find((u) => u.email === 'demo9090');
+            if (demoUser) cleaned.push(demoUser);
+          } else {
+            cleaned[demoIdx] = {
+              ...cleaned[demoIdx],
+              email: 'demo9090',
+              password: 'demo9090',
+              status: 'active',
+              validityPlan: 'lifetime',
+            };
+          }
         }
 
-        // Ensure upifree92@gmail.com user exists in the list for admin activation
-        const upiUserIdx = cleaned.findIndex((u) => u.email.toLowerCase() === 'upifree92@gmail.com');
-        if (upiUserIdx === -1) {
-          const upiDefault = DEFAULT_USERS.find((u) => u.email === 'upifree92@gmail.com');
-          if (upiDefault) cleaned.push(upiDefault);
+        // Ensure upifree92@gmail.com user exists ONLY if NOT deleted by admin
+        if (
+          !deletedList.includes('user_upifree92') &&
+          !deletedList.includes('upifree92@gmail.com')
+        ) {
+          const upiUserIdx = cleaned.findIndex((u) => u.email.toLowerCase() === 'upifree92@gmail.com');
+          if (upiUserIdx === -1) {
+            const upiDefault = DEFAULT_USERS.find((u) => u.email === 'upifree92@gmail.com');
+            if (upiDefault) cleaned.push(upiDefault);
+          }
         }
 
         // Clean "free" from user names if present
@@ -241,9 +278,14 @@ export function getRegisteredUsers(): RegisteredUser[] {
   } catch (err) {
     console.error('Failed to load registered users:', err);
   }
-  // Initialize default users if not found
+  // Initialize default users if not found, filtering out any deleted accounts
   try {
-    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(DEFAULT_USERS));
+    const deletedList = getDeletedUserIds();
+    const initialDefaults = DEFAULT_USERS.filter(
+      (u) => !deletedList.includes(u.id) && !deletedList.includes(u.email.toLowerCase())
+    );
+    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(initialDefaults));
+    return initialDefaults;
   } catch {
     // ignore
   }
@@ -390,6 +432,9 @@ export function registerCustomer(params: {
   const users = getRegisteredUsers();
   const cleanEmail = params.email.trim().toLowerCase();
   const cleanName = params.name.trim();
+
+  // If this email was previously deleted, unblacklist it so user can register fresh
+  unblacklistUser(cleanEmail);
 
   if (!cleanName) {
     return { success: false, error: 'Customer Name is required' };
@@ -670,10 +715,58 @@ export function updateUserStatus(
 }
 
 export function deleteRegisteredUser(userId: string): boolean {
-  const users = getRegisteredUsers();
-  const filtered = users.filter((u) => u.id !== userId);
-  saveRegisteredUsers(filtered);
-  return true;
+  try {
+    const users = getRegisteredUsers();
+    const target = users.find(
+      (u) => u.id === userId || u.email.toLowerCase() === userId.toLowerCase()
+    );
+    if (!target) return false;
+
+    // Never delete super admin
+    if (
+      target.role === 'admin' ||
+      target.email.toLowerCase() === 'kgfilewala@gmail.com'
+    ) {
+      return false;
+    }
+
+    // Add to persistent deleted blacklist
+    const deleted = getDeletedUserIds();
+    if (!deleted.includes(target.id)) {
+      deleted.push(target.id);
+    }
+    if (target.email && !deleted.includes(target.email.toLowerCase())) {
+      deleted.push(target.email.toLowerCase());
+    }
+    localStorage.setItem(DELETED_USERS_KEY, JSON.stringify(deleted));
+
+    // Remove from registered users list
+    const filtered = users.filter(
+      (u) =>
+        u.id !== target.id &&
+        u.email.toLowerCase() !== target.email.toLowerCase()
+    );
+    saveRegisteredUsers(filtered);
+
+    // If active session belongs to this deleted customer, clear it
+    try {
+      const activeEmail = localStorage.getItem('logged_in_user_email');
+      if (
+        activeEmail &&
+        activeEmail.toLowerCase() === target.email.toLowerCase()
+      ) {
+        localStorage.removeItem('logged_in_user_email');
+        localStorage.removeItem('user_role');
+      }
+    } catch {
+      // ignore
+    }
+
+    return true;
+  } catch (err) {
+    console.error('Failed to delete user:', err);
+    return false;
+  }
 }
 
 export function markAllNotificationsRead(): void {

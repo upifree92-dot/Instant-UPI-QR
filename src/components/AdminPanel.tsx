@@ -111,7 +111,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [copiedModalField, setCopiedModalField] = useState<string | null>(null);
   const [validityToast, setValidityToast] = useState<{
     message: string;
-    type: 'success' | 'info';
+    type: 'success' | 'info' | 'error';
   } | null>(null);
 
   // Admin-only Password Change state
@@ -303,22 +303,35 @@ create policy "Allow all access to transactions" on transactions for all using (
     setSelectedCustomer((prev) => (prev ? list.find((u) => u.id === prev.id) || null : null));
   };
 
+  const [customerToDelete, setCustomerToDelete] = useState<RegisteredUser | null>(null);
+
   const handleUpdateStatus = (
     userId: string,
     newStatus: 'active' | 'pending' | 'rejected',
     plan: ValidityPlan = '1_month'
   ) => {
+    const targetUser = usersList.find((u) => u.id === userId);
     updateUserStatus(userId, newStatus, plan);
     refreshUsersData();
-    const targetUser = usersList.find((u) => u.id === userId);
+
     if (newStatus === 'active') {
       const planItem = VALIDITY_PLANS.find((p) => p.id === plan);
       setValidityToast({
-        message: `Gmail Account for ${targetUser?.email || targetUser?.name || 'Customer'} activated successfully (${planItem?.label || plan})!`,
+        message: `Account for ${targetUser?.email || targetUser?.name || 'Customer'} activated successfully (${planItem?.label || plan})!`,
         type: 'success',
       });
-      setTimeout(() => setValidityToast(null), 4000);
+    } else if (newStatus === 'rejected') {
+      setValidityToast({
+        message: `Customer ${targetUser?.email || targetUser?.name || ''} has been REJECTED.`,
+        type: 'error',
+      });
+    } else if (newStatus === 'pending') {
+      setValidityToast({
+        message: `Customer ${targetUser?.email || targetUser?.name || ''} marked as Pending.`,
+        type: 'info',
+      });
     }
+    setTimeout(() => setValidityToast(null), 4000);
   };
 
   const handleSetCustomerValidity = (
@@ -343,9 +356,34 @@ create policy "Allow all access to transactions" on transactions for all using (
   };
 
   const handleDeleteCustomer = (userId: string) => {
-    deleteRegisteredUser(userId);
-    setSelectedCustomer((prev) => (prev?.id === userId ? null : prev));
-    refreshUsersData();
+    const target = usersList.find((u) => u.id === userId);
+    if (target) {
+      setCustomerToDelete(target);
+    }
+  };
+
+  const handleConfirmDeleteCustomer = () => {
+    if (!customerToDelete) return;
+    const target = customerToDelete;
+    if (target.role === 'admin' || target.email.toLowerCase() === 'kgfilewala@gmail.com') {
+      alert('Super Admin account cannot be deleted.');
+      setCustomerToDelete(null);
+      return;
+    }
+
+    const success = deleteRegisteredUser(target.id);
+    if (success) {
+      if (selectedCustomer?.id === target.id) {
+        setSelectedCustomer(null);
+      }
+      setCustomerToDelete(null);
+      refreshUsersData();
+      setValidityToast({
+        message: `Customer ${target.email || target.name} deleted permanently.`,
+        type: 'info',
+      });
+      setTimeout(() => setValidityToast(null), 4000);
+    }
   };
 
   const handleCopyCustomerCredentials = (user: RegisteredUser) => {
@@ -920,15 +958,29 @@ create policy "Allow all access to transactions" on transactions for all using (
 
               {/* Toast Banner */}
               {validityToast && (
-                <div className="p-3.5 rounded-xl bg-emerald-600 text-white shadow-md flex items-center justify-between gap-3 animate-in fade-in">
+                <div
+                  className={`p-3.5 rounded-xl text-white shadow-md flex items-center justify-between gap-3 animate-in fade-in ${
+                    validityToast.type === 'error'
+                      ? 'bg-rose-600'
+                      : validityToast.type === 'info'
+                      ? 'bg-slate-900'
+                      : 'bg-emerald-600'
+                  }`}
+                >
                   <div className="flex items-center gap-2 text-xs font-extrabold">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-200 shrink-0" />
+                    {validityToast.type === 'error' ? (
+                      <XCircle className="w-4 h-4 text-rose-200 shrink-0" />
+                    ) : validityToast.type === 'info' ? (
+                      <AlertCircle className="w-4 h-4 text-slate-300 shrink-0" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-200 shrink-0" />
+                    )}
                     <span>{validityToast.message}</span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setValidityToast(null)}
-                    className="text-emerald-200 hover:text-white text-xs font-bold px-2 py-0.5 rounded cursor-pointer"
+                    className="text-white/80 hover:text-white text-xs font-bold px-2 py-0.5 rounded cursor-pointer"
                   >
                     Dismiss
                   </button>
@@ -1210,19 +1262,61 @@ create policy "Allow all access to transactions" on transactions for all using (
 
                             {/* Action Button */}
                             <td className="py-3.5 px-4 text-right">
-                              <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center justify-end gap-1.5">
                                 {user.status === 'pending' && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleUpdateStatus(user.id, 'active', user.validityPlan || '1_month');
+                                      }}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-xs transition-all active:scale-95 cursor-pointer whitespace-nowrap animate-pulse hover:animate-none"
+                                      title="Approve & Activate Customer Account"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      <span>Activate</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleUpdateStatus(user.id, 'rejected');
+                                      }}
+                                      className="inline-flex items-center gap-1 px-2 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-extrabold text-xs rounded-xl transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                                      title="Reject Customer Registration"
+                                    >
+                                      <XCircle className="w-3.5 h-3.5" />
+                                      <span>Reject</span>
+                                    </button>
+                                  </>
+                                )}
+                                {user.status === 'active' && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleUpdateStatus(user.id, 'rejected');
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2 py-1.5 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 font-extrabold text-xs rounded-xl transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                                    title="Reject or Suspend Customer"
+                                  >
+                                    <XCircle className="w-3.5 h-3.5" />
+                                    <span>Reject</span>
+                                  </button>
+                                )}
+                                {user.status === 'rejected' && (
                                   <button
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleUpdateStatus(user.id, 'active', user.validityPlan || '1_month');
                                     }}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-xs transition-all active:scale-95 cursor-pointer whitespace-nowrap animate-pulse hover:animate-none"
-                                    title="Approve & Activate Customer Gmail Account"
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 font-extrabold text-xs rounded-xl transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                                    title="Re-Activate Customer"
                                   >
                                     <CheckCircle2 className="w-3.5 h-3.5" />
-                                    <span>Activate</span>
+                                    <span>Re-Activate</span>
                                   </button>
                                 )}
                                 <button
@@ -1231,11 +1325,22 @@ create policy "Allow all access to transactions" on transactions for all using (
                                     e.stopPropagation();
                                     handleStartChangePassword(user);
                                   }}
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-                                  title="Change User Password (Admin Only)"
+                                  className="inline-flex items-center gap-1 px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                                  title="Change User Password"
                                 >
                                   <KeyRound className="w-3.5 h-3.5 text-slate-600" />
-                                  <span>Password</span>
+                                  <span className="hidden xl:inline">Password</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteCustomer(user.id);
+                                  }}
+                                  className="inline-flex items-center justify-center w-7 h-7 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 transition-all active:scale-95 cursor-pointer"
+                                  title="Delete Customer Permanently"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                   type="button"
@@ -1243,11 +1348,11 @@ create policy "Allow all access to transactions" on transactions for all using (
                                     e.stopPropagation();
                                     setSelectedCustomer(user);
                                   }}
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
                                   title="Open full customer details"
                                 >
-                                  <span>Full Details</span>
-                                  <ChevronRight className="w-3.5 h-3.5" />
+                                  <span>Details</span>
+                                  <ChevronRight className="w-3 h-3" />
                                 </button>
                               </div>
                             </td>
@@ -1320,21 +1425,63 @@ create policy "Allow all access to transactions" on transactions for all using (
                         </div>
                       </div>
 
-                      <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                      <div className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
                         <span>ID: <span className="font-mono text-slate-700">{user.email}</span></span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           {user.status === 'pending' && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUpdateStatus(user.id, 'active', user.validityPlan || '1_month');
+                                }}
+                                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-2xs animate-pulse"
+                                title="Approve & Activate Customer Account"
+                              >
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>Activate</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUpdateStatus(user.id, 'rejected');
+                                }}
+                                className="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-extrabold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                                title="Reject Registration"
+                              >
+                                <XCircle className="w-3 h-3" />
+                                <span>Reject</span>
+                              </button>
+                            </>
+                          )}
+                          {user.status === 'active' && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUpdateStatus(user.id, 'rejected');
+                              }}
+                              className="px-2 py-1 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700 font-extrabold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                              title="Reject Account"
+                            >
+                              <XCircle className="w-3 h-3" />
+                              <span>Reject</span>
+                            </button>
+                          )}
+                          {user.status === 'rejected' && (
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleUpdateStatus(user.id, 'active', user.validityPlan || '1_month');
                               }}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-2xs animate-pulse"
-                              title="Approve & Activate Customer Gmail Account"
+                              className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 font-extrabold text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+                              title="Re-activate Account"
                             >
                               <CheckCircle2 className="w-3 h-3" />
-                              <span>Activate</span>
+                              <span>Re-Activate</span>
                             </button>
                           )}
                           <button
@@ -1344,12 +1491,23 @@ create policy "Allow all access to transactions" on transactions for all using (
                               handleStartChangePassword(user);
                             }}
                             className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-[10px] rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
-                            title="Change User Password (Admin Only)"
+                            title="Change User Password"
                           >
                             <KeyRound className="w-3 h-3 text-slate-600" />
-                            <span>Password</span>
+                            <span>Pass</span>
                           </button>
-                          <span className="font-bold text-emerald-700">Full Details ➔</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteCustomer(user.id);
+                            }}
+                            className="p-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Customer Permanently"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="font-bold text-emerald-700 text-[11px]">Details ➔</span>
                         </div>
                       </div>
                     </div>
@@ -2325,7 +2483,24 @@ create policy "Allow all access to transactions" on transactions for all using (
                             className="px-3 py-1.5 bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 font-extrabold text-xs rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
                           >
                             <XCircle className="w-3.5 h-3.5" />
-                            <span>Reject</span>
+                            <span>Reject Customer</span>
+                          </button>
+                        )}
+
+                        {selectedCustomer.status === 'rejected' && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleUpdateStatus(
+                                selectedCustomer.id,
+                                'active',
+                                selectedCustomer.validityPlan || '1_month'
+                              )
+                            }
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Re-Activate Customer</span>
                           </button>
                         )}
                       </div>
@@ -2513,6 +2688,67 @@ create policy "Allow all access to transactions" on transactions for all using (
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* CUSTOMER DELETE CONFIRMATION MODAL */}
+        {customerToDelete && (
+          <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-150">
+            <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-rose-200 overflow-hidden">
+              <div className="p-5 bg-rose-50 border-b border-rose-100 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center shadow-xs">
+                    <Trash2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900">Delete Customer Account</h3>
+                    <p className="text-[11px] font-semibold text-rose-700">Permanent Removal</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCustomerToDelete(null)}
+                  className="w-7 h-7 rounded-lg bg-rose-100/70 hover:bg-rose-200 text-rose-700 flex items-center justify-center cursor-pointer transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                <p className="text-xs text-slate-700 leading-relaxed">
+                  Are you sure you want to permanently delete customer{' '}
+                  <strong className="text-slate-900 font-black">
+                    {customerToDelete.name || customerToDelete.email}
+                  </strong>{' '}
+                  (<span className="font-mono text-slate-600">{customerToDelete.email}</span>)?
+                </p>
+
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-xs text-amber-900">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong>Warning:</strong> This will delete their account credentials, validity, and access immediately. This action cannot be undone.
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setCustomerToDelete(null)}
+                    className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmDeleteCustomer}
+                    className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs cursor-pointer shadow-sm active:scale-95 transition-all flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Yes, Delete Customer</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
