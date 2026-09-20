@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Copy,
   RefreshCw,
+  Lock,
 } from 'lucide-react';
 import { MerchantConfig } from '../types';
 import { announceSoundbox } from '../utils/sound';
@@ -428,6 +429,24 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
               </div>
             </div>
           )}
+
+          {/* Account Password Security Notice */}
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 flex items-start gap-3">
+            <div className="p-2 rounded-xl bg-slate-200 text-slate-700 shrink-0">
+              <Lock className="w-4 h-4" />
+            </div>
+            <div className="space-y-0.5 flex-1">
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold text-slate-900 text-xs">Password Security</span>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 bg-amber-100 text-amber-900 rounded-md border border-amber-300">
+                  Admin Only Change
+                </span>
+              </div>
+              <p className="text-slate-600 text-[11px] leading-relaxed">
+                User passwords can only be changed or reset by the <strong>System Administrator</strong>. Regular users cannot change passwords directly.
+              </p>
+            </div>
+          </div>
 
           {/* Form Actions */}
           <div className="flex items-center justify-between pt-3 border-t border-slate-100 gap-2">

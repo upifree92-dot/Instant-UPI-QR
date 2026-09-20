@@ -346,6 +346,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     )}
                   </button>
                 </div>
+                <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
+                  <span className="flex items-center gap-1 text-slate-600 font-medium">
+                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                    <span>Password: <strong className="text-slate-800">Admin change only</strong></span>
+                  </span>
+                  <span className="text-slate-400 text-[10px]">
+                    Contact Admin to reset
+                  </span>
+                </div>
               </div>
 
               {/* Save Name & Password (Remember Login) Option */}

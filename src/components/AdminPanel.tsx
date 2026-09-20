@@ -63,6 +63,7 @@ import {
   VALIDITY_PLANS,
   updateUserValidity,
   getUserValidityInfo,
+  updateUserPassword,
 } from '../lib/userStore';
 
 interface AdminPanelProps {
@@ -111,6 +112,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     message: string;
     type: 'success' | 'info';
   } | null>(null);
+
+  // Admin-only Password Change state
+  const [editingPasswordUser, setEditingPasswordUser] = useState<RegisteredUser | null>(null);
+  const [newPasswordInput, setNewPasswordInput] = useState<string>('');
+  const [showNewPassword, setShowNewPassword] = useState<boolean>(true);
+  const [passwordChangeSuccess, setPasswordChangeSuccess] = useState<string | null>(null);
+  const [passwordChangeError, setPasswordChangeError] = useState<string | null>(null);
 
   // New Customer Form inside Admin
   const [addName, setAddName] = useState('');
@@ -298,6 +306,65 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
       ...prev,
       [id]: !prev[id],
     }));
+  };
+
+  const handleStartChangePassword = (user: RegisteredUser) => {
+    setEditingPasswordUser(user);
+    setNewPasswordInput('');
+    setPasswordChangeSuccess(null);
+    setPasswordChangeError(null);
+    setShowNewPassword(true);
+  };
+
+  const handleSaveChangedPassword = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!editingPasswordUser) return;
+    const trimmed = newPasswordInput.trim();
+    if (!trimmed || trimmed.length < 3) {
+      setPasswordChangeError('Password must be at least 3 characters long');
+      return;
+    }
+
+    const res = updateUserPassword(editingPasswordUser.id, trimmed);
+    if (!res.success) {
+      setPasswordChangeError(res.error || 'Failed to update password');
+      return;
+    }
+
+    setPasswordChangeError(null);
+    setPasswordChangeSuccess(`Password updated successfully! New password: "${trimmed}"`);
+    refreshUsersData();
+    if (selectedCustomer && selectedCustomer.id === editingPasswordUser.id) {
+      setSelectedCustomer((prev) => (prev ? { ...prev, password: trimmed } : null));
+    }
+    setValidityToast({
+      message: `Password changed for ${editingPasswordUser.name} (${editingPasswordUser.email}) to "${trimmed}"!`,
+      type: 'success',
+    });
+    setTimeout(() => {
+      setValidityToast(null);
+    }, 4000);
+
+    setTimeout(() => {
+      setEditingPasswordUser(null);
+      setPasswordChangeSuccess(null);
+    }, 1800);
+  };
+
+  const handleGeneratePinPassword = () => {
+    const randomPin = Math.floor(100000 + Math.random() * 900000).toString();
+    setNewPasswordInput(randomPin);
+    setPasswordChangeError(null);
+  };
+
+  const handleGenerateStrongPassword = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$';
+    let res = '';
+    for (let i = 0; i < 8; i++) {
+      res += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setNewPasswordInput(res);
+    setPasswordChangeError(null);
   };
 
   const handleMarkNotificationsRead = () => {
@@ -920,11 +987,11 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
             </div>
 
             {/* One-Page Customer Directory Notice */}
-            <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-3.5 flex items-center justify-between gap-3 text-xs">
+            <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2.5 text-emerald-950 font-bold">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
                 <span>
-                  One-Page Customer Directory: Click on any customer row or the <strong>Full Details</strong> button to view complete details, credentials & validity settings.
+                  <strong>One-Page Directory & Password Control:</strong> Only Admin can change user passwords. Click <strong>Password</strong> or <strong>Full Details</strong> on any customer to view credentials, set passwords, or extend validity.
                 </span>
               </div>
               <span className="text-[11px] font-extrabold text-emerald-800 bg-white px-2.5 py-1 rounded-lg border border-emerald-300 shrink-0">
@@ -1089,6 +1156,18 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    handleStartChangePassword(user);
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                                  title="Change User Password (Admin Only)"
+                                >
+                                  <KeyRound className="w-3.5 h-3.5 text-slate-600" />
+                                  <span>Password</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     setSelectedCustomer(user);
                                   }}
                                   className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
@@ -1170,7 +1249,21 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
 
                       <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
                         <span>ID: <span className="font-mono text-slate-700">{user.email}</span></span>
-                        <span className="font-bold text-emerald-700">Tap for Full Details ➔</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleStartChangePassword(user);
+                            }}
+                            className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-[10px] rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                            title="Change User Password (Admin Only)"
+                          >
+                            <KeyRound className="w-3 h-3 text-slate-600" />
+                            <span>Password</span>
+                          </button>
+                          <span className="font-bold text-emerald-700">Full Details ➔</span>
+                        </div>
                       </div>
                     </div>
                   );
@@ -1891,14 +1984,19 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
 
                       {/* Password */}
                       <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs">
-                        <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
-                          Customer Password:
-                        </span>
-                        <div className="flex items-center justify-between gap-2 mt-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                            Customer Password:
+                          </span>
+                          <span className="text-[9px] font-extrabold text-amber-800 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                            Admin Only Change
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 mt-1.5">
                           <span className="font-mono font-black text-slate-900 text-sm tracking-wider">
                             {modalPasswordVisible ? selectedCustomer.password : '••••••••••••'}
                           </span>
-                          <div className="flex items-center gap-1">
+                          <div className="flex items-center gap-1.5">
                             <button
                               type="button"
                               onClick={() => setModalPasswordVisible(!modalPasswordVisible)}
@@ -1922,6 +2020,15 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                               ) : (
                                 <Copy className="w-3.5 h-3.5" />
                               )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleStartChangePassword(selectedCustomer)}
+                              className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-lg transition-all active:scale-95 cursor-pointer flex items-center gap-1 shadow-2xs"
+                              title="Change this customer's password (Admin Only)"
+                            >
+                              <KeyRound className="w-3.5 h-3.5" />
+                              <span>Change</span>
                             </button>
                           </div>
                         </div>
@@ -2164,6 +2271,165 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
             </div>
           );
         })()}
+
+        {/* ADMIN-ONLY CHANGE PASSWORD MODAL */}
+        {editingPasswordUser && (
+          <div className="fixed inset-0 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 animate-in fade-in">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-150">
+              {/* Modal Header */}
+              <div className="p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-400 flex items-center justify-center font-bold">
+                    <KeyRound className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-base text-white">Change User Password</h3>
+                    <p className="text-[11px] text-emerald-400 font-bold">Admin Exclusive Authority</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingPasswordUser(null)}
+                  className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Form Body */}
+              <form onSubmit={handleSaveChangedPassword} className="p-5 space-y-4 text-xs">
+                {/* User Card info */}
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white font-black text-sm flex items-center justify-center shrink-0">
+                    {editingPasswordUser.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-black text-slate-900 text-sm truncate">{editingPasswordUser.name}</p>
+                    <p className="text-slate-500 font-mono text-[11px] truncate">{editingPasswordUser.email}</p>
+                    <p className="text-slate-500 text-[10px] truncate">{editingPasswordUser.businessName || 'Merchant Store'}</p>
+                  </div>
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-slate-200 text-slate-700 rounded-md shrink-0">
+                    {editingPasswordUser.role}
+                  </span>
+                </div>
+
+                {/* Security Rule Notice */}
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-amber-900 leading-relaxed font-medium">
+                    <strong>Admin Security Rule:</strong> Normal users cannot change their passwords. Only the <strong>Admin</strong> has exclusive permission to set or reset this account password.
+                  </p>
+                </div>
+
+                {/* Current Password Display */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                      Current Password:
+                    </span>
+                    <span className="font-mono font-bold text-slate-800 text-xs">
+                      {editingPasswordUser.password}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyField(editingPasswordUser.password, 'curr_pass')}
+                    className="px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-slate-600 font-bold text-[10px] hover:bg-slate-100 flex items-center gap-1 cursor-pointer"
+                  >
+                    {copiedModalField === 'curr_pass' ? (
+                      <Check className="w-3 h-3 text-emerald-600" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                    <span>Copy</span>
+                  </button>
+                </div>
+
+                {/* New Password Input */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                    New Password *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPasswordInput}
+                      onChange={(e) => {
+                        setNewPasswordInput(e.target.value);
+                        setPasswordChangeError(null);
+                      }}
+                      placeholder="Enter new password (min 3 characters)"
+                      className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white focus:outline-none rounded-xl text-xs font-mono font-bold text-slate-900"
+                      autoFocus
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {/* Quick Generators */}
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    <button
+                      type="button"
+                      onClick={handleGeneratePinPassword}
+                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg font-bold text-[11px] text-slate-700 transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3 h-3 text-amber-600" />
+                      <span>Generate 6-Digit PIN</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleGenerateStrongPassword}
+                      className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-lg font-bold text-[11px] text-slate-700 transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <KeyRound className="w-3 h-3 text-emerald-600" />
+                      <span>Generate Strong Pass</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Error Banner */}
+                {passwordChangeError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{passwordChangeError}</span>
+                  </div>
+                )}
+
+                {/* Success Banner */}
+                {passwordChangeSuccess && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs font-bold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>{passwordChangeSuccess}</span>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setEditingPasswordUser(null)}
+                    className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs cursor-pointer shadow-sm active:scale-95 transition-all flex items-center gap-1.5"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Save New Password</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

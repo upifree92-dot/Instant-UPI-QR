@@ -404,6 +404,51 @@ export function registerCustomer(params: {
   return { success: true, user: newUser };
 }
 
+export function updateUserPassword(
+  userIdOrEmail: string,
+  newPassword: string
+): { success: boolean; user?: RegisteredUser; error?: string } {
+  if (!newPassword || newPassword.trim().length < 3) {
+    return { success: false, error: 'Password must be at least 3 characters long' };
+  }
+  const cleanPass = newPassword.trim();
+  const users = getRegisteredUsers();
+  const clean = userIdOrEmail.trim().toLowerCase();
+  const idx = users.findIndex(
+    (u) =>
+      u.email.toLowerCase() === clean ||
+      u.id === userIdOrEmail ||
+      (u.phone && u.phone.toLowerCase() === clean)
+  );
+
+  if (idx === -1) {
+    return { success: false, error: 'User not found' };
+  }
+
+  users[idx].password = cleanPass;
+  saveRegisteredUsers(users);
+
+  // If saved credentials in localStorage match this user, update them
+  try {
+    const raw = localStorage.getItem('upi_saved_login_credentials_v1');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (
+        parsed.username &&
+        (parsed.username.toLowerCase() === users[idx].email.toLowerCase() ||
+          parsed.username.toLowerCase() === clean)
+      ) {
+        localStorage.setItem(
+          'upi_saved_login_credentials_v1',
+          JSON.stringify({ ...parsed, password: cleanPass })
+        );
+      }
+    }
+  } catch {}
+
+  return { success: true, user: users[idx] };
+}
+
 export function authenticateUser(
   identifier: string,
   pass: string
@@ -416,7 +461,62 @@ export function authenticateUser(
   const cleanId = identifier.trim().toLowerCase();
   const cleanPass = pass.trim();
 
-  // 1. Direct super-admin check
+  // Query registered users first to honor any changed passwords
+  const users = getRegisteredUsers();
+  const matched = users.find(
+    (u) =>
+      u.email.toLowerCase() === cleanId ||
+      (cleanId === 'demo9090' && u.email.toLowerCase() === 'demo9090') ||
+      (cleanId === 'demo9090@gmail.com' && u.email.toLowerCase() === 'demo9090') ||
+      u.email.toLowerCase() === `${cleanId}@gmail.com` ||
+      (cleanId.endsWith('@gmail.com') && u.email.toLowerCase() === cleanId.replace('@gmail.com', '')) ||
+      (u.phone && u.phone.toLowerCase() === cleanId)
+  );
+
+  // If found in store
+  if (matched) {
+    if (matched.password !== cleanPass) {
+      return {
+        success: false,
+        error: 'Incorrect password. Please try again or ask Admin to reset it.',
+      };
+    }
+
+    if (matched.status === 'pending') {
+      return {
+        success: false,
+        error: 'Your account is pending Admin Validation. Please ask the Administrator to approve your account in the Admin Panel.',
+      };
+    }
+
+    if (matched.status === 'rejected') {
+      return {
+        success: false,
+        error: 'Your account has been rejected or disabled by the Administrator.',
+      };
+    }
+
+    // Expiry check for active users
+    if (matched.status === 'active') {
+      const validity = getUserValidityInfo(matched);
+      if (validity.isExpired) {
+        return {
+          success: false,
+          error: `Your account validity (${validity.planLabel}) expired on ${validity.formattedExpiry}. Please contact the Administrator to renew for 1 Month, 3 Months, 6 Months, or 1 Year.`,
+        };
+      }
+    }
+
+    return {
+      success: true,
+      user: matched,
+      isAdmin:
+        matched.role === 'admin' ||
+        matched.email.toLowerCase() === 'kgfilewala@gmail.com',
+    };
+  }
+
+  // Fallback 1: Direct super-admin check if not found in list
   if (cleanId === 'kgfilewala@gmail.com' && cleanPass === 'bbbb@9090') {
     return {
       success: true,
@@ -437,88 +537,32 @@ export function authenticateUser(
     };
   }
 
-  // 2. Direct demo9090 customer check
+  // Fallback 2: Direct demo9090 customer check if not found
   if ((cleanId === 'demo9090' || cleanId === 'demo9090@gmail.com') && cleanPass === 'demo9090') {
-    const allUsers = getRegisteredUsers();
-    const demoFound = allUsers.find((u) => u.email.toLowerCase() === 'demo9090') || {
-      id: 'user_demo9090',
-      name: 'Demo User',
-      email: 'demo9090',
-      password: 'demo9090',
-      phone: '9090909090',
-      businessName: 'Demo Store',
-      role: 'customer' as const,
-      status: 'active' as const,
-      validityPlan: 'lifetime' as const,
-      validUntil: new Date(Date.now() + 86400000 * 3650).toISOString(),
-      validFrom: new Date(Date.now() - 86400000 * 30).toISOString(),
-      registeredAt: new Date().toISOString(),
-      isNotificationRead: true,
-    };
     return {
       success: true,
       isAdmin: false,
-      user: demoFound,
+      user: {
+        id: 'user_demo9090',
+        name: 'Demo User',
+        email: 'demo9090',
+        password: 'demo9090',
+        phone: '9090909090',
+        businessName: 'Demo Store',
+        role: 'customer' as const,
+        status: 'active' as const,
+        validityPlan: 'lifetime' as const,
+        validUntil: new Date(Date.now() + 86400000 * 3650).toISOString(),
+        validFrom: new Date(Date.now() - 86400000 * 30).toISOString(),
+        registeredAt: new Date().toISOString(),
+        isNotificationRead: true,
+      },
     };
-  }
-
-  // 3. Query registered users
-  const users = getRegisteredUsers();
-  const matched = users.find(
-    (u) =>
-      u.email.toLowerCase() === cleanId ||
-      (cleanId === 'demo9090' && u.email.toLowerCase() === 'demo9090') ||
-      (cleanId === 'demo9090@gmail.com' && u.email.toLowerCase() === 'demo9090') ||
-      u.email.toLowerCase() === `${cleanId}@gmail.com` ||
-      (cleanId.endsWith('@gmail.com') && u.email.toLowerCase() === cleanId.replace('@gmail.com', '')) ||
-      (u.phone && u.phone.toLowerCase() === cleanId)
-  );
-
-  if (!matched) {
-    return {
-      success: false,
-      error: 'Account not found. Please check credentials or Register a new account.',
-    };
-  }
-
-  if (matched.password !== cleanPass) {
-    return {
-      success: false,
-      error: 'Incorrect password. Please try again.',
-    };
-  }
-
-  if (matched.status === 'pending') {
-    return {
-      success: false,
-      error: 'Your account is pending Admin Validation. Please ask the Administrator to approve your account in the Admin Panel.',
-    };
-  }
-
-  if (matched.status === 'rejected') {
-    return {
-      success: false,
-      error: 'Your account has been rejected or disabled by the Administrator.',
-    };
-  }
-
-  // Expiry check for active users
-  if (matched.status === 'active') {
-    const validity = getUserValidityInfo(matched);
-    if (validity.isExpired) {
-      return {
-        success: false,
-        error: `Your account validity (${validity.planLabel}) expired on ${validity.formattedExpiry}. Please contact the Administrator to renew for 1 Month, 3 Months, 6 Months, or 1 Year.`,
-      };
-    }
   }
 
   return {
-    success: true,
-    user: matched,
-    isAdmin:
-      matched.role === 'admin' ||
-      matched.email.toLowerCase() === 'kgfilewala@gmail.com',
+    success: false,
+    error: 'Account not found. Please check credentials or Register a new account.',
   };
 }
 
