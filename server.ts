@@ -70,12 +70,12 @@ const INITIAL_USERS = [
     phone: '8598912555',
     businessName: 'Upi Digital Store',
     role: 'customer',
-    status: 'pending',
+    status: 'active',
     validityPlan: '1_month',
     validUntil: new Date(Date.now() + 86400000 * 30).toISOString(),
     validFrom: new Date().toISOString(),
     registeredAt: new Date().toISOString(),
-    isNotificationRead: false,
+    isNotificationRead: true,
   },
 ];
 
@@ -290,14 +290,79 @@ async function startServer() {
 
       users[idx].status = status;
       if (validityPlan) users[idx].validityPlan = validityPlan;
-      if (validFrom) users[idx].validFrom = validFrom;
-      if (validUntil) users[idx].validUntil = validUntil;
+
+      if (status === 'active') {
+        const plan = validityPlan || users[idx].validityPlan || '1_month';
+        users[idx].validityPlan = plan;
+        users[idx].validFrom = validFrom || new Date().toISOString();
+        const days =
+          plan === '1_month'
+            ? 30
+            : plan === '3_months'
+            ? 90
+            : plan === '6_months'
+            ? 180
+            : plan === '1_year'
+            ? 365
+            : 3650;
+        users[idx].validUntil =
+          validUntil || new Date(Date.now() + days * 86400000).toISOString();
+        users[idx].isNotificationRead = true;
+      } else {
+        if (validFrom) users[idx].validFrom = validFrom;
+        if (validUntil) users[idx].validUntil = validUntil;
+      }
 
       saveUsers(users);
       console.log(`[API] User ${users[idx].email} status updated to ${status}`);
       // Super automatic instant push to all connected clients & admin panels
       broadcastSse('user_updated', { user: users[idx], users });
       return res.json({ success: true, user: users[idx] });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Batch activate all pending users or specified userIds
+  app.post('/api/users/batch-activate', (req, res) => {
+    try {
+      const { plan = '1_month', userIds } = req.body;
+      const users = loadUsers();
+      let count = 0;
+
+      const days =
+        plan === '1_month'
+          ? 30
+          : plan === '3_months'
+          ? 90
+          : plan === '6_months'
+          ? 180
+          : plan === '1_year'
+          ? 365
+          : 3650;
+
+      for (const u of users) {
+        if (
+          u.role !== 'admin' &&
+          u.email?.toLowerCase() !== 'kgfilewala@gmail.com' &&
+          (u.status === 'pending' || (Array.isArray(userIds) && userIds.includes(u.id)))
+        ) {
+          u.status = 'active';
+          u.validityPlan = plan;
+          u.validFrom = new Date().toISOString();
+          u.validUntil = new Date(Date.now() + days * 86400000).toISOString();
+          u.isNotificationRead = true;
+          count++;
+        }
+      }
+
+      if (count > 0) {
+        saveUsers(users);
+        console.log(`[API] Batch activated ${count} pending customers with plan ${plan}`);
+        broadcastSse('users_synced', { users });
+      }
+
+      return res.json({ success: true, count, users });
     } catch (err: any) {
       return res.status(500).json({ success: false, error: err.message });
     }
@@ -389,6 +454,19 @@ async function startServer() {
             // New user registered on client, add to server!
             serverUsers.push(cu);
             changed = true;
+          } else {
+            // If client has active/rejected status update, update server
+            if (cu.status && cu.status !== serverUsers[existingIdx].status) {
+              serverUsers[existingIdx].status = cu.status;
+              if (cu.validityPlan) serverUsers[existingIdx].validityPlan = cu.validityPlan;
+              if (cu.validUntil) serverUsers[existingIdx].validUntil = cu.validUntil;
+              if (cu.validFrom) serverUsers[existingIdx].validFrom = cu.validFrom;
+              changed = true;
+            }
+            if (cu.isNotificationRead && !serverUsers[existingIdx].isNotificationRead) {
+              serverUsers[existingIdx].isNotificationRead = true;
+              changed = true;
+            }
           }
         }
         if (changed) {

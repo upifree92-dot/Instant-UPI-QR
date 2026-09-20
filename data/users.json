@@ -1,0 +1,45 @@
+[
+  {
+    "id": "admin_kgfilewala",
+    "name": "Super Admin",
+    "email": "kgfilewala@gmail.com",
+    "password": "bbbb@9090",
+    "role": "admin",
+    "status": "active",
+    "validityPlan": "lifetime",
+    "validUntil": "2036-09-17T08:46:35.339Z",
+    "validFrom": "2026-08-21T08:46:35.340Z",
+    "registeredAt": "2026-09-18T08:46:35.340Z",
+    "isNotificationRead": true
+  },
+  {
+    "id": "user_cust_anita",
+    "name": "Anita Verma",
+    "email": "anita@gmail.com",
+    "password": "anita",
+    "phone": "9823456789",
+    "businessName": "Verma Collection",
+    "role": "customer",
+    "status": "active",
+    "validityPlan": "3_months",
+    "validUntil": "2026-12-19T08:46:35.340Z",
+    "validFrom": "2026-09-20T08:46:35.340Z",
+    "registeredAt": "2026-09-15T08:46:35.340Z",
+    "isNotificationRead": true
+  },
+  {
+    "id": "user_upifree92",
+    "name": "Upi",
+    "email": "upifree92@gmail.com",
+    "password": "demo",
+    "phone": "8598912555",
+    "businessName": "Upi Digital Store",
+    "role": "customer",
+    "status": "active",
+    "validityPlan": "1_month",
+    "validUntil": "2026-10-20T08:46:35.340Z",
+    "validFrom": "2026-09-20T08:46:35.340Z",
+    "registeredAt": "2026-09-20T08:46:35.340Z",
+    "isNotificationRead": false
+  }
+]

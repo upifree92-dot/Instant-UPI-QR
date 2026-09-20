@@ -188,9 +188,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     syncWithServerUsers().catch(() => {});
 
     const unsubscribe = subscribeToSuperAutoConnect((payload) => {
+      const targetEmail = (username || regEmail || pendingActivationInfo?.email || '').trim().toLowerCase();
+      if (!targetEmail) return;
+
       if (payload.type === 'user_updated' && payload.user) {
-        const targetEmail = (username || regEmail || pendingActivationInfo?.email || '').trim().toLowerCase();
-        if (targetEmail && payload.user.email?.toLowerCase() === targetEmail) {
+        if (payload.user.email?.toLowerCase() === targetEmail) {
           if (payload.user.status === 'active') {
             setError(null);
             setSuccessMsg(`🎉 Super Connect: Account (${payload.user.email}) has been ACTIVATED by Admin! You can log in now.`);
@@ -201,6 +203,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             }
           } else if (payload.user.status === 'rejected') {
             setError('Account registration was declined. WhatsApp: 8598912555');
+          }
+        }
+      } else if (payload.type === 'users_synced' && Array.isArray(payload.users)) {
+        const found = payload.users.find((u: any) => u.email?.toLowerCase() === targetEmail);
+        if (found && found.status === 'active') {
+          setError(null);
+          setSuccessMsg(`🎉 Super Connect: Account (${found.email}) has been ACTIVATED by Admin! You can log in now.`);
+          setMode('login');
+          setUsername(found.email);
+          if (found.password && !password) {
+            setPassword(found.password);
           }
         }
       }

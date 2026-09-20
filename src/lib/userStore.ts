@@ -182,12 +182,12 @@ const DEFAULT_USERS: RegisteredUser[] = [
     phone: '8598912555',
     businessName: 'Upi Digital Store',
     role: 'customer',
-    status: 'pending',
+    status: 'active',
     validityPlan: '1_month',
     validUntil: new Date(Date.now() + 86400000 * 30).toISOString(),
     validFrom: new Date().toISOString(),
     registeredAt: new Date().toISOString(),
-    isNotificationRead: false,
+    isNotificationRead: true,
   },
 ];
 
@@ -845,27 +845,24 @@ export function updateUserValidity(
 export function updateUserStatus(
   userId: string,
   newStatus: 'active' | 'pending' | 'rejected',
-  defaultPlan: ValidityPlan = '1_month'
+  chosenPlan?: ValidityPlan
 ): boolean {
   const users = getRegisteredUsers();
-  const index = users.findIndex((u) => u.id === userId);
+  const index = users.findIndex(
+    (u) => u.id === userId || u.email.toLowerCase() === userId.toLowerCase()
+  );
   if (index === -1) return false;
 
   const existing = users[index];
-
-  let targetPlan = existing.validityPlan || defaultPlan;
-  let targetValidFrom = existing.validFrom;
+  const targetPlan = chosenPlan || existing.validityPlan || '1_month';
+  let targetValidFrom = existing.validFrom || new Date().toISOString();
   let targetValidUntil = existing.validUntil;
 
-  // If activating and user has no validUntil or is expired, assign validity
+  // When activating, always calculate fresh validity from NOW using chosen plan
   if (newStatus === 'active') {
-    const validity = getUserValidityInfo(existing);
-    if (validity.isExpired || !existing.validUntil) {
-      targetPlan = existing.validityPlan || defaultPlan;
-      const calc = calculateValidityExpiry(targetPlan);
-      targetValidFrom = existing.validFrom || calc.validFrom;
-      targetValidUntil = calc.validUntil;
-    }
+    const calc = calculateValidityExpiry(targetPlan);
+    targetValidFrom = calc.validFrom;
+    targetValidUntil = calc.validUntil;
   }
 
   users[index] = {
@@ -874,25 +871,82 @@ export function updateUserStatus(
     validityPlan: targetPlan,
     validFrom: targetValidFrom,
     validUntil: targetValidUntil,
+    isNotificationRead: true,
   };
   saveRegisteredUsers(users);
 
-  // Sync to server API
+  // Sync to server API immediately
   try {
     fetch('/api/users/update-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        userId,
+        userId: existing.id,
         status: newStatus,
         validityPlan: targetPlan,
         validFrom: targetValidFrom,
         validUntil: targetValidUntil,
       }),
-    }).catch(() => {});
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.user) {
+          broadcastUsersUpdated({ type: 'user_updated', user: data.user });
+        }
+      })
+      .catch(() => {});
   } catch {}
 
   return true;
+}
+
+export async function batchActivatePendingUsers(
+  plan: ValidityPlan = '1_month'
+): Promise<{ success: boolean; count: number }> {
+  // 1. Update local users immediately
+  const users = getRegisteredUsers();
+  let count = 0;
+  const updated = users.map((u) => {
+    if (
+      u.role !== 'admin' &&
+      u.email.toLowerCase() !== 'kgfilewala@gmail.com' &&
+      u.status === 'pending'
+    ) {
+      const calc = calculateValidityExpiry(plan);
+      count++;
+      return {
+        ...u,
+        status: 'active' as const,
+        validityPlan: plan,
+        validFrom: calc.validFrom,
+        validUntil: calc.validUntil,
+        isNotificationRead: true,
+      };
+    }
+    return u;
+  });
+
+  if (count > 0) {
+    saveRegisteredUsers(updated);
+  }
+
+  // 2. Call server batch activate API
+  try {
+    const res = await fetch('/api/users/batch-activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.users)) {
+        saveRegisteredUsers(data.users);
+        return { success: true, count: data.count || count };
+      }
+    }
+  } catch {}
+
+  return { success: true, count };
 }
 
 export function deleteRegisteredUser(userId: string): boolean {

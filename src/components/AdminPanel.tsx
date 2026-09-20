@@ -46,6 +46,8 @@ import {
   Share2,
   CheckCheck,
   Download,
+  Mail,
+  MessageSquare,
 } from 'lucide-react';
 import { MerchantConfig, PresetAmount, RegisteredUser, ValidityPlan } from '../types';
 import {
@@ -57,6 +59,7 @@ import { announceSoundbox } from '../utils/sound';
 import {
   getRegisteredUsers,
   updateUserStatus,
+  batchActivatePendingUsers,
   deleteRegisteredUser,
   registerCustomer,
   markAllNotificationsRead,
@@ -1099,18 +1102,96 @@ create policy "Allow all access to transactions" on transactions for all using (
 
               {/* Batch Pending Banner */}
               {pendingCustomers > 0 && (
-                <div className="p-4 rounded-xl bg-gradient-to-r from-amber-50 via-amber-50/80 to-amber-100/60 border border-amber-300 space-y-2">
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-50 via-amber-50/90 to-emerald-50/40 border-2 border-amber-300 shadow-sm space-y-3">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="flex items-center gap-2 text-amber-950 text-xs font-bold">
-                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                      <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
                       <span>
-                        <strong>{pendingCustomers} New Registration(s) — Gmail Activation Required!</strong>
+                        <strong className="text-amber-900 font-black">
+                          {pendingCustomers} New Registration Pending Approval!
+                        </strong>{' '}
+                        <span className="text-amber-800/90 font-medium">
+                          — Click &quot;Activate&quot; below to instantly unlock customer login.
+                        </span>
                       </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap pt-1">
-                    <span className="text-[11px] font-bold text-amber-900">
-                      1-Click Approve & Activate All For:
+
+                  {/* Quick Individual Pending Action Cards */}
+                  <div className="space-y-2 pt-1">
+                    {usersList
+                      .filter((u) => isCustomerUser(u) && u.status === 'pending')
+                      .map((pUser) => {
+                        const emailSubject = encodeURIComponent('Your UPI Merchant Account is Activated!');
+                        const emailBody = encodeURIComponent(
+                          `Hello ${pUser.name},\n\nYour account (${pUser.email}) on UPI Payment Generator has been APPROVED and ACTIVATED by Admin.\n\nYou can now log in to generate UPI QR codes and soundbox alerts.\n\nThank you!`
+                        );
+                        const cleanPhone = (pUser.phone || '').replace(/[^0-9]/g, '');
+
+                        return (
+                          <div
+                            key={pUser.id}
+                            className="flex items-center justify-between flex-wrap gap-2.5 p-2.5 bg-white rounded-xl border border-amber-200/80 shadow-2xs text-xs"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-[200px]">
+                              <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 font-bold flex items-center justify-center shrink-0 text-xs">
+                                {pUser.name.charAt(0).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-extrabold text-slate-900 truncate">
+                                  {pUser.name}
+                                </div>
+                                <div className="text-[11px] font-mono text-slate-500 truncate">
+                                  {pUser.email} {pUser.phone ? `• ${pUser.phone}` : ''}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateStatus(pUser.id, 'active', pUser.validityPlan || '1_month')
+                                }
+                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold text-xs rounded-lg shadow-xs flex items-center gap-1.5 cursor-pointer transition-all"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Activate (1 Month)</span>
+                              </button>
+
+                              <a
+                                href={`mailto:${pUser.email}?subject=${emailSubject}&body=${emailBody}`}
+                                className="px-2.5 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 font-bold text-[11px] rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                                title="Send confirmation email to customer via Gmail / Mail App"
+                              >
+                                <Mail className="w-3.5 h-3.5 text-sky-600" />
+                                <span>Gmail</span>
+                              </a>
+
+                              {cleanPhone && (
+                                <a
+                                  href={`https://wa.me/91${cleanPhone}?text=${encodeURIComponent(
+                                    `Hello ${pUser.name}, your account (${pUser.email}) has been ACTIVATED by Admin. You can now log in!`
+                                  )}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2.5 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-[#128C7E] border border-[#25D366]/30 font-bold text-[11px] rounded-lg flex items-center gap-1 cursor-pointer transition-colors"
+                                  title="Send confirmation via WhatsApp"
+                                >
+                                  <MessageSquare className="w-3.5 h-3.5 text-[#25D366]" />
+                                  <span>WhatsApp</span>
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                  {/* Batch Plan Buttons */}
+                  <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-amber-200/60">
+                    <span className="text-[11px] font-bold text-amber-950">
+                      1-Click Activate All For:
                     </span>
                     {(['1_month', '3_months', '6_months', '1_year'] as ValidityPlan[]).map((pKey) => {
                       const labelMap: Record<string, string> = {
@@ -1123,20 +1204,17 @@ create policy "Allow all access to transactions" on transactions for all using (
                         <button
                           key={pKey}
                           type="button"
-                          onClick={() => {
-                            usersList
-                              .filter((u) => isCustomerUser(u) && u.status === 'pending')
-                              .forEach((u) => {
-                                updateUserStatus(u.id, 'active', pKey);
-                              });
+                          onClick={async () => {
+                            const res = await batchActivatePendingUsers(pKey);
                             markAllNotificationsRead();
                             refreshUsersData();
                             setValidityToast({
-                              message: `All pending customer accounts validated with ${labelMap[pKey]} validity!`,
+                              message: `Successfully activated ${res.count} pending customer accounts with ${labelMap[pKey]} validity!`,
                               type: 'success',
                             });
+                            setTimeout(() => setValidityToast(null), 4000);
                           }}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-lg active:scale-95 transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
+                          className="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs rounded-lg active:scale-95 transition-all cursor-pointer shadow-2xs flex items-center gap-1"
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span>{labelMap[pKey]}</span>
