@@ -85,21 +85,6 @@ export const UpiCard: React.FC<UpiCardProps> = ({
             </div>
           </div>
         </div>
-
-        {/* Dynamic Amount Pill below QR if amount > 0 */}
-        {finalAmount > 0 && (
-          <div className="mt-3 py-1 px-3 bg-emerald-50 border border-emerald-300 rounded-full flex items-center gap-1.5 animate-in fade-in zoom-in-95 duration-200">
-            <span className="text-xs text-slate-600 font-medium">QR Amount:</span>
-            <span className="text-sm font-extrabold text-emerald-800">
-              ₹{finalAmount % 1 === 0 ? finalAmount : finalAmount.toFixed(2)}
-            </span>
-            {config.isExtraEnabled && config.extraPercentage > 0 && (
-              <span className="text-[11px] font-semibold text-emerald-600">
-                (₹{baseAmount} + {config.extraPercentage}%)
-              </span>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );
