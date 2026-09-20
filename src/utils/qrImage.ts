@@ -98,10 +98,10 @@ export async function generateQrImageBlob(
         // Supported Apps Footer
         ctx.fillStyle = '#f8fafc';
         ctx.fillRect(0, height - 75, width, 75);
-        ctx.fillStyle = '#475569';
+        ctx.fillStyle = '#1e293b';
         ctx.font = 'bold 18px sans-serif';
         ctx.fillText(
-          'Google Pay  •  PhonePe  •  Paytm  •  BHIM UPI',
+          'Google Pay  •  PhonePe  •  Paytm  •  BHIM  •  Amazon Pay  •  All UPI',
           width / 2,
           height - 32
         );
