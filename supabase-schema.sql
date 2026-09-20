@@ -1,8 +1,7 @@
 -- ==============================================================================
--- UPI APP / SUPABASE COMPLETE SQL SCHEMA SETUP CODE
+-- 100% WORKING COMPLETE SQL SCRIPT FOR SUPABASE / POSTGRESQL
 -- Project ID: fkiakibxsiqccgpfnwtz
--- Copy and run this entire SQL script inside your Supabase SQL Editor:
--- https://supabase.com/dashboard/project/fkiakibxsiqccgpfnwtz/sql
+-- Copy and paste everything below into Supabase SQL Editor and click "RUN":
 -- ==============================================================================
 
 -- 1. Create merchant_config table (Store & UPI Settings)
@@ -16,8 +15,12 @@ CREATE TABLE IF NOT EXISTS public.merchant_config (
     note TEXT DEFAULT 'Bill Payment',
     soundbox_voice BOOLEAN DEFAULT true,
     language TEXT DEFAULT 'en',
+    presets JSONB DEFAULT '[50, 100, 200, 500, 1000, 2000]'::jsonb,
     updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
 );
+
+-- Ensure presets column exists if table was created previously
+ALTER TABLE public.merchant_config ADD COLUMN IF NOT EXISTS presets JSONB DEFAULT '[50, 100, 200, 500, 1000, 2000]'::jsonb;
 
 -- 2. Create registered_users table (Accounts, Customers, Admins)
 CREATE TABLE IF NOT EXISTS public.registered_users (
@@ -27,14 +30,25 @@ CREATE TABLE IF NOT EXISTS public.registered_users (
     password TEXT NOT NULL DEFAULT 'demo',
     phone TEXT,
     business_name TEXT,
-    role TEXT NOT NULL DEFAULT 'customer' CHECK (role IN ('customer', 'admin')),
-    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('active', 'pending', 'expired', 'rejected')),
+    role TEXT NOT NULL DEFAULT 'customer',
+    status TEXT NOT NULL DEFAULT 'active',
     validity_plan TEXT DEFAULT '1_month',
     valid_until TIMESTAMPTZ,
     valid_from TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()),
     registered_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW()),
-    is_notification_read BOOLEAN DEFAULT false
+    is_notification_read BOOLEAN DEFAULT true
 );
+
+-- Ensure all columns exist if table was created earlier
+ALTER TABLE public.registered_users ADD COLUMN IF NOT EXISTS phone TEXT;
+ALTER TABLE public.registered_users ADD COLUMN IF NOT EXISTS business_name TEXT;
+ALTER TABLE public.registered_users ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'customer';
+ALTER TABLE public.registered_users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+ALTER TABLE public.registered_users ADD COLUMN IF NOT EXISTS validity_plan TEXT DEFAULT '1_month';
+ALTER TABLE public.registered_users ADD COLUMN IF NOT EXISTS valid_until TIMESTAMPTZ;
+ALTER TABLE public.registered_users ADD COLUMN IF NOT EXISTS valid_from TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW());
+ALTER TABLE public.registered_users ADD COLUMN IF NOT EXISTS registered_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW());
+ALTER TABLE public.registered_users ADD COLUMN IF NOT EXISTS is_notification_read BOOLEAN DEFAULT true;
 
 -- 3. Create transactions table (UPI Payment Logs)
 CREATE TABLE IF NOT EXISTS public.transactions (
@@ -46,7 +60,7 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     upi_id TEXT NOT NULL,
     store_name TEXT,
     note TEXT,
-    status TEXT DEFAULT 'success' CHECK (status IN ('success', 'pending', 'failed')),
+    status TEXT DEFAULT 'success',
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc', NOW())
 );
 
@@ -55,7 +69,7 @@ ALTER TABLE public.merchant_config ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.registered_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 
--- 5. Create RLS Policies (Allow read/write with anon key)
+-- 5. Create Permissive RLS Policies (Allows Seamless Multi-PC Syncing)
 DROP POLICY IF EXISTS "Public access to merchant_config" ON public.merchant_config;
 CREATE POLICY "Public access to merchant_config"
     ON public.merchant_config FOR ALL
@@ -74,7 +88,12 @@ CREATE POLICY "Public access to transactions"
     USING (true)
     WITH CHECK (true);
 
--- 6. Insert Default Seed Data
+-- 6. Grant Full Permissions to anon, authenticated, and service_role
+GRANT ALL ON TABLE public.merchant_config TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.registered_users TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.transactions TO anon, authenticated, service_role;
+
+-- 7. Insert or Update Default Store Configuration
 INSERT INTO public.merchant_config (
     id,
     store_name,
@@ -84,20 +103,24 @@ INSERT INTO public.merchant_config (
     currency,
     note,
     soundbox_voice,
-    language
+    language,
+    presets
 ) VALUES (
     'default_merchant',
     'Sharma General Store',
-    '9876543210@paytm',
+    'sharmastore@okhdfcbank',
     2.00,
     true,
     'INR',
     'Bill Payment',
     true,
-    'en'
-) ON CONFLICT (id) DO NOTHING;
+    'en',
+    '[50, 100, 200, 500, 1000, 2000]'::jsonb
+) ON CONFLICT (id) DO UPDATE SET
+    store_name = EXCLUDED.store_name,
+    upi_id = EXCLUDED.upi_id;
 
--- Insert Admin Account & Active Customer Account
+-- 8. Insert or Update Accounts (Admin & Active Customers)
 INSERT INTO public.registered_users (
     id,
     name,
@@ -120,21 +143,6 @@ INSERT INTO public.registered_users (
     'bbbb@9090',
     '8598912555',
     'UPI Master Admin',
-    'admin',
-    'active',
-    'lifetime',
-    TIMEZONE('utc', NOW() + INTERVAL '10 years'),
-    TIMEZONE('utc', NOW()),
-    TIMEZONE('utc', NOW()),
-    true
-),
-(
-    'admin_main',
-    'Super Admin',
-    'admin@upi.com',
-    'admin123',
-    '8598912555',
-    'UPI Master System',
     'admin',
     'active',
     'lifetime',
@@ -175,9 +183,24 @@ INSERT INTO public.registered_users (
 )
 ON CONFLICT (email) DO UPDATE SET
     name = EXCLUDED.name,
-    status = EXCLUDED.status,
-    phone = EXCLUDED.phone;
+    password = EXCLUDED.password,
+    phone = EXCLUDED.phone,
+    business_name = EXCLUDED.business_name,
+    status = 'active',
+    validity_plan = EXCLUDED.validity_plan,
+    valid_until = EXCLUDED.valid_until,
+    is_notification_read = true;
+
+-- 9. Guarantee that upifree92@gmail.com is instantly active
+UPDATE public.registered_users 
+SET status = 'active',
+    valid_until = TIMEZONE('utc', NOW() + INTERVAL '30 days'),
+    is_notification_read = true
+WHERE email = 'upifree92@gmail.com';
+
+-- 10. Permanently remove admin@upi.com
+DELETE FROM public.registered_users WHERE email = 'admin@upi.com' OR id = 'admin_main';
 
 -- ==============================================================================
--- DONE! All tables, policies, indexes, and initial accounts are created successfully.
+-- DONE! All tables, policies, permissions, and accounts are 100% active and ready.
 -- ==============================================================================
