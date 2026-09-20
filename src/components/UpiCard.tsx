@@ -8,6 +8,7 @@ interface UpiCardProps {
   finalAmount: number;
   baseAmount: number;
   onOpenSettings?: () => void;
+  isCustomer?: boolean;
 }
 
 export const UpiCard: React.FC<UpiCardProps> = ({
@@ -15,6 +16,7 @@ export const UpiCard: React.FC<UpiCardProps> = ({
   finalAmount,
   baseAmount,
   onOpenSettings,
+  isCustomer = false,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -59,7 +61,7 @@ export const UpiCard: React.FC<UpiCardProps> = ({
           <h2 className="font-bold text-[19px] sm:text-xl text-slate-900 leading-tight">
             {config.storeName || 'Sharma General Store'}
           </h2>
-          {onOpenSettings && (
+          {!isCustomer && onOpenSettings && (
             <button
               id="btn-edit-store-name"
               type="button"
@@ -75,7 +77,7 @@ export const UpiCard: React.FC<UpiCardProps> = ({
           {config.upiId || 'sharmastore@okhdfcbank'}
         </p>
 
-        {config.storeName === 'Sharma General Store' && onOpenSettings && (
+        {!isCustomer && config.storeName === 'Sharma General Store' && onOpenSettings && (
           <button
             type="button"
             onClick={onOpenSettings}

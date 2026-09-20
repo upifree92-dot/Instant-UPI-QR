@@ -472,7 +472,8 @@ export default function App() {
           config={config}
           finalAmount={finalAmount}
           baseAmount={baseAmount}
-          onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenSettings={userRole === 'admin' ? () => setIsSettingsOpen(true) : undefined}
+          isCustomer={userRole !== 'admin'}
         />
 
         {/* Bill / Balance Amount & Quick Surcharges Section */}

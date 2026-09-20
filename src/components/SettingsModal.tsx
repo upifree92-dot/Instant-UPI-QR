@@ -159,18 +159,20 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
 
         {/* Modal Body */}
         <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-4 flex-1">
-          {/* Permanent Save Notice */}
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-start gap-2.5">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-            <div className="text-xs">
-              <p className="font-extrabold text-emerald-950">
-                Permanent Save Guarantee
-              </p>
-              <p className="text-emerald-800 text-[11px] mt-0.5">
-                Ek baar Store Name aur UPI ID save karne ke baad hamesha saved rahega.
-              </p>
+          {/* Permanent Save Notice - Admin Only */}
+          {isAdmin && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-start gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="text-xs">
+                <p className="font-extrabold text-emerald-950">
+                  Permanent Save Guarantee
+                </p>
+                <p className="text-emerald-800 text-[11px] mt-0.5">
+                  Ek baar Store Name aur UPI ID save karne ke baad hamesha saved rahega.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Store Name */}
           <div>
@@ -179,20 +181,31 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                 <Store className="w-4 h-4 text-emerald-600" />
                 <span>Store / Business Name</span>
               </label>
-              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
-                Permanent Save
-              </span>
+              {isAdmin && (
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                  Permanent Save
+                </span>
+              )}
             </div>
-            <input
-              type="text"
-              required
-              value={formData.storeName}
-              onChange={(e) =>
-                setFormData({ ...formData, storeName: e.target.value })
-              }
-              placeholder="e.g. Sharma General Store"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none text-sm font-semibold text-slate-800"
-            />
+            {isAdmin ? (
+              <input
+                type="text"
+                required
+                value={formData.storeName}
+                onChange={(e) =>
+                  setFormData({ ...formData, storeName: e.target.value })
+                }
+                placeholder="e.g. Sharma General Store"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none text-sm font-semibold text-slate-800"
+              />
+            ) : (
+              <div className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-800 flex items-center justify-between">
+                <span>{formData.storeName}</span>
+                <span className="text-[10px] font-bold text-slate-500 bg-slate-200/80 px-2 py-0.5 rounded-md">
+                  Assigned by Admin
+                </span>
+              </div>
+            )}
           </div>
 
           {/* UPI ID / VPA */}
@@ -202,23 +215,36 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                 <CreditCard className="w-4 h-4 text-emerald-600" />
                 <span>UPI ID / VPA (Receiving UPI Address)</span>
               </label>
-              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
-                Permanent Save
-              </span>
+              {isAdmin && (
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                  Permanent Save
+                </span>
+              )}
             </div>
-            <input
-              type="text"
-              required
-              value={formData.upiId}
-              onChange={(e) =>
-                setFormData({ ...formData, upiId: e.target.value })
-              }
-              placeholder="e.g. sharmastore@okhdfcbank or yournumber@ybl"
-              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none text-sm font-medium text-slate-800"
-            />
-            <p className="text-[11px] text-slate-400 mt-1">
-              Supports Google Pay, PhonePe, Paytm, BHIM, Amazon Pay & all UPI apps.
-            </p>
+            {isAdmin ? (
+              <>
+                <input
+                  type="text"
+                  required
+                  value={formData.upiId}
+                  onChange={(e) =>
+                    setFormData({ ...formData, upiId: e.target.value })
+                  }
+                  placeholder="e.g. sharmastore@okhdfcbank or yournumber@ybl"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 outline-none text-sm font-medium text-slate-800"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Supports Google Pay, PhonePe, Paytm, BHIM, Amazon Pay & all UPI apps.
+                </p>
+              </>
+            ) : (
+              <div className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-mono font-medium text-slate-800 flex items-center justify-between">
+                <span>{formData.upiId}</span>
+                <span className="text-[10px] font-bold text-slate-500 bg-slate-200/80 px-2 py-0.5 rounded-md font-sans">
+                  Assigned by Admin
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Extra Percentage Surcharge */}
@@ -422,14 +448,16 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
 
           {/* Form Actions */}
           <div className="flex items-center justify-between pt-3 border-t border-slate-100 gap-2">
-            <button
-              type="button"
-              onClick={onResetDefaults}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset Surcharge to 2%</span>
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={onResetDefaults}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Surcharge to 2%</span>
+              </button>
+            )}
 
             <button
               id="btn-save-settings"

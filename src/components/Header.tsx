@@ -60,7 +60,7 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={onOpenSettings}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-400 bg-emerald-50/80 text-emerald-800 font-bold text-sm hover:bg-emerald-100/80 active:scale-95 transition-all shadow-xs cursor-pointer"
         >
-          <Settings className="w-4 h-4 stroke-[2.2] text-emerald-700 animate-spin-slow" />
+          <Settings className="w-4 h-4 stroke-[2.2] text-emerald-700" />
           <span>Settings</span>
         </button>
 
