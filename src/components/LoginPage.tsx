@@ -218,14 +218,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       <div className="w-full max-w-md">
         {/* Header Logo */}
         <div className="flex flex-col items-center text-center mb-5">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white shadow-lg shadow-emerald-700/25 mb-3">
-            <QrCode className="w-9 h-9 stroke-[2.2]" />
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-900 via-emerald-950 to-teal-900 flex items-center justify-center text-white shadow-xl shadow-emerald-950/20 mb-3 border border-emerald-500/30">
+            <QrCode className="w-9 h-9 stroke-[2.2] text-emerald-400" />
           </div>
-          <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            Instant UPI Portal
-          </h1>
-          <p className="text-sm font-medium text-slate-500 mt-0.5">
-            Instant UPI Payment Terminal
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+              OmniPay Elite
+            </h1>
+            <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-md shadow-2xs">
+              PRO
+            </span>
+          </div>
+          <p className="text-xs font-bold text-emerald-800 bg-emerald-50/90 border border-emerald-200/80 px-3 py-1 rounded-full mt-2 inline-flex items-center gap-1.5 shadow-2xs">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Smart Enterprise Merchant POS Terminal</span>
           </p>
         </div>
 
@@ -345,15 +351,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                       <Eye className="w-4 h-4" />
                     )}
                   </button>
-                </div>
-                <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500">
-                  <span className="flex items-center gap-1 text-slate-600 font-medium">
-                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                    <span>Password: <strong className="text-slate-800">Admin change only</strong></span>
-                  </span>
-                  <span className="text-slate-400 text-[10px]">
-                    Contact Admin to reset
-                  </span>
                 </div>
               </div>
 
