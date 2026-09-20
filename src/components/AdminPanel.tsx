@@ -247,6 +247,15 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
   ) => {
     updateUserStatus(userId, newStatus, plan);
     refreshUsersData();
+    const targetUser = usersList.find((u) => u.id === userId);
+    if (newStatus === 'active') {
+      const planItem = VALIDITY_PLANS.find((p) => p.id === plan);
+      setValidityToast({
+        message: `Gmail Account for ${targetUser?.email || targetUser?.name || 'Customer'} activated successfully (${planItem?.label || plan})!`,
+        type: 'success',
+      });
+      setTimeout(() => setValidityToast(null), 4000);
+    }
   };
 
   const handleSetCustomerValidity = (
@@ -870,13 +879,13 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                     <div className="flex items-center gap-2 text-amber-950 text-xs font-bold">
                       <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
                       <span>
-                        <strong>{pendingCustomers} Customer Registration(s) Pending Validation!</strong>
+                        <strong>{pendingCustomers} New Registration(s) — Gmail Activation Required!</strong>
                       </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap pt-1">
                     <span className="text-[11px] font-bold text-amber-900">
-                      1-Click Approve All Pending For:
+                      1-Click Approve & Activate All For:
                     </span>
                     {(['1_month', '3_months', '6_months', '1_year'] as ValidityPlan[]).map((pKey) => {
                       const labelMap: Record<string, string> = {
@@ -1139,6 +1148,20 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                             {/* Action Button */}
                             <td className="py-3.5 px-4 text-right">
                               <div className="flex items-center justify-end gap-2">
+                                {user.status === 'pending' && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleUpdateStatus(user.id, 'active', user.validityPlan || '1_month');
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-xs transition-all active:scale-95 cursor-pointer whitespace-nowrap animate-pulse hover:animate-none"
+                                    title="Approve & Activate Customer Gmail Account"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    <span>Activate</span>
+                                  </button>
+                                )}
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -1157,7 +1180,7 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                                     e.stopPropagation();
                                     setSelectedCustomer(user);
                                   }}
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
                                   title="Open full customer details"
                                 >
                                   <span>Full Details</span>
@@ -1237,6 +1260,20 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                       <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
                         <span>ID: <span className="font-mono text-slate-700">{user.email}</span></span>
                         <div className="flex items-center gap-2">
+                          {user.status === 'pending' && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUpdateStatus(user.id, 'active', user.validityPlan || '1_month');
+                              }}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] rounded-lg transition-colors cursor-pointer flex items-center gap-1 shadow-2xs animate-pulse"
+                              title="Approve & Activate Customer Gmail Account"
+                            >
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>Activate</span>
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={(e) => {

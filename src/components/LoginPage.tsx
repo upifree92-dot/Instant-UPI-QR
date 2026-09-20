@@ -191,7 +191,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         phone: regPhone,
         businessName: regStore,
         role: 'customer',
-        status: 'active',
+        status: 'pending',
         validityPlan: selectedPlan,
       });
 
@@ -202,9 +202,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         return;
       }
 
-      const planTitle = PACKAGES.find((p) => p.id === selectedPlan)?.title || '1 Month';
+      const activePkg = PACKAGES.find((p) => p.id === selectedPlan) || PACKAGES[0];
       setSuccessMsg(
-        `Account registered successfully for ${regName} (${planTitle} Package)! You can now sign in.`
+        `Registration Submitted for ${regName}! Gmail (${regEmail}) account activation ke liye Admin Panel par bhej diya gaya hai (${activePkg.title} • ₹${activePkg.price}). Admin dwara activate hone ke baad aap login kar sakenge.`
       );
 
       // Prepopulate login form and switch to login tab

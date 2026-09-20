@@ -390,8 +390,8 @@ export function registerCustomer(params: {
     phone: params.phone?.trim() || '',
     businessName: params.businessName?.trim() || '',
     role: params.role || 'customer',
-    // Default to active so user can immediately use or be validated in admin
-    status: params.status || 'active',
+    // Default to pending so admin can approve and activate the customer account
+    status: params.status || 'pending',
     validityPlan: assignedPlan,
     validFrom,
     validUntil,
@@ -486,7 +486,7 @@ export function authenticateUser(
     if (matched.status === 'pending') {
       return {
         success: false,
-        error: 'Your account is pending Admin Validation. Please ask the Administrator to approve your account in the Admin Panel.',
+        error: `Account Activation Pending: Aapka Gmail / Account (${matched.email}) abhi Admin validation ke liye pending hai. Admin dwara Admin Panel se Activate hone ke baad login karein.`,
       };
     }
 
