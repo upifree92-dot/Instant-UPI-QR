@@ -23,6 +23,8 @@ import {
   checkSupabaseConnection,
   saveMerchantConfigToCloud,
 } from '../lib/supabase';
+import { WhatsAppIcon } from './LoginPage';
+import { RegisteredUser } from '../types';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -32,6 +34,38 @@ interface SettingsModalProps {
   onResetDefaults: () => void;
   isAdmin?: boolean;
   onOpenAdminPanel?: () => void;
+  currentUser?: RegisteredUser;
+}
+
+const ADMIN_SUPPORT_WHATSAPP = '8598912555';
+
+function buildWhatsAppSupportUrl(info: {
+  customerName?: string;
+  customerEmail?: string;
+  storeName?: string;
+  customerPhone?: string;
+}): string {
+  const cleanName =
+    (info.customerName || 'Customer')
+      .replace(/\bfree\b/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim() || 'Customer';
+
+  const lines = [
+    `💬 *UPI APP CUSTOMER SUPPORT & HELP*`,
+    ``,
+    `Hello Admin! I need assistance with my account / app. Please check.`,
+    ``,
+    `👤 *Customer Name:* ${cleanName}`,
+    info.customerEmail ? `📧 *Gmail / User ID:* ${info.customerEmail}` : '',
+    info.storeName && info.storeName !== 'Sharma General Store' ? `🏪 *Store / Business:* ${info.storeName}` : '',
+    info.customerPhone ? `📱 *Phone Number:* ${info.customerPhone}` : '',
+    ``,
+    `*Problem Details:*`,
+    `(Please describe your question or issue here...)`,
+  ].filter(Boolean);
+
+  return `https://wa.me/91${ADMIN_SUPPORT_WHATSAPP}?text=${encodeURIComponent(lines.join('\n'))}`;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -42,6 +76,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onResetDefaults,
   isAdmin = false,
   onOpenAdminPanel,
+  currentUser,
 }) => {
   const [formData, setFormData] = useState<MerchantConfig>({ ...config });
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -446,6 +481,63 @@ create policy "Allow all access to merchant_config" on merchant_config for all u
                 User passwords can only be changed or reset by the <strong>System Administrator</strong>. Regular users cannot change passwords directly.
               </p>
             </div>
+          </div>
+
+          {/* 24/7 WhatsApp Support & Help Card */}
+          <div className="bg-gradient-to-br from-emerald-50/90 via-teal-50/60 to-green-50/90 border-2 border-emerald-300 rounded-2xl p-4 shadow-xs space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-[#25D366] text-white flex items-center justify-center shadow-xs shrink-0">
+                  <WhatsAppIcon className="w-5 h-5 fill-current" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-slate-900 text-sm">
+                      Admin WhatsApp Support
+                    </span>
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-full">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                      Active 24/7
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 font-medium">
+                    If you face any problem or issue, contact directly on WhatsApp
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-700 leading-relaxed">
+              If you experience any issues with QR code, payments, store setup, or validity, please contact Admin directly on WhatsApp at <strong className="text-emerald-950 font-extrabold">8598912555</strong>.
+            </p>
+
+            <a
+              id="btn-settings-whatsapp-support"
+              href={buildWhatsAppSupportUrl({
+                customerName:
+                  currentUser?.name ||
+                  (formData.storeName && formData.storeName !== 'Sharma General Store'
+                    ? formData.storeName
+                    : 'Customer'),
+                customerEmail:
+                  currentUser?.email ||
+                  (() => {
+                    try {
+                      return localStorage.getItem('logged_in_user_email') || '';
+                    } catch {
+                      return '';
+                    }
+                  })(),
+                storeName: formData.storeName,
+                customerPhone: currentUser?.phone || '8598912555',
+              })}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2.5 w-full py-3 px-4 rounded-xl bg-[#25D366] hover:bg-[#20ba59] active:scale-[0.98] text-white font-extrabold text-sm shadow-md hover:shadow-lg transition-all group cursor-pointer"
+            >
+              <WhatsAppIcon className="w-5 h-5 fill-current group-hover:scale-110 transition-transform" />
+              <span>Contact Admin on WhatsApp (8598912555)</span>
+            </a>
           </div>
 
           {/* Form Actions */}

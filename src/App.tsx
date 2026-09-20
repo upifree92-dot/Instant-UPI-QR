@@ -539,6 +539,7 @@ export default function App() {
         onResetDefaults={handleResetDefaults}
         isAdmin={userRole === 'admin'}
         onOpenAdminPanel={userRole === 'admin' ? () => setCurrentView('admin') : undefined}
+        currentUser={currentUser}
       />
 
       {/* Share Modal */}
