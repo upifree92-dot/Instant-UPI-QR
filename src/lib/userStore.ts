@@ -8,12 +8,13 @@ export const VALIDITY_PLANS: {
   shortLabel: string;
   days: number;
   months: number;
+  price?: number;
   description: string;
 }[] = [
-  { id: '1_month', label: '1 Month', shortLabel: '1M', days: 30, months: 1, description: '30 Days Access' },
-  { id: '3_months', label: '3 Months', shortLabel: '3M', days: 90, months: 3, description: '90 Days Access' },
-  { id: '6_months', label: '6 Months', shortLabel: '6M', days: 180, months: 6, description: '180 Days Access' },
-  { id: '1_year', label: '1 Year', shortLabel: '1Y', days: 365, months: 12, description: '365 Days Access' },
+  { id: '1_month', label: '1 Month', shortLabel: '1M', days: 30, months: 1, price: 500, description: '₹500 / 30 Days' },
+  { id: '3_months', label: '3 Months', shortLabel: '3M', days: 90, months: 3, price: 1299, description: '₹1,299 / 90 Days' },
+  { id: '6_months', label: '6 Months', shortLabel: '6M', days: 180, months: 6, price: 2199, description: '₹2,199 / 180 Days' },
+  { id: '1_year', label: '1 Year', shortLabel: '1Y', days: 365, months: 12, price: 2999, description: '₹2,999 / 365 Days' },
   { id: 'lifetime', label: 'Lifetime / Master', shortLabel: 'All', days: 36500, months: 1200, description: 'Permanent Access' },
 ];
 

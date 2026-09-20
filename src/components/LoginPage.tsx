@@ -15,9 +15,26 @@ import {
   Store,
   CheckCircle2,
   Check,
+  Calendar,
+  Sparkles,
 } from 'lucide-react';
-import { UserRole } from '../types';
+import { UserRole, ValidityPlan } from '../types';
 import { authenticateUser, registerCustomer } from '../lib/userStore';
+
+const PACKAGES: {
+  id: ValidityPlan;
+  title: string;
+  duration: string;
+  price: number;
+  originalPrice?: number;
+  saveText?: string;
+  tag?: string;
+}[] = [
+  { id: '1_month', title: '1 Month', duration: '30 Days', price: 500 },
+  { id: '3_months', title: '3 Month', duration: '90 Days', price: 1299, originalPrice: 1500, saveText: 'Save ₹201' },
+  { id: '6_months', title: '6 Month', duration: '180 Days', price: 2199, originalPrice: 3000, saveText: 'Save ₹801', tag: 'Popular' },
+  { id: '1_year', title: '1 Year', duration: '365 Days', price: 2999, originalPrice: 6000, saveText: 'Save ₹3001', tag: 'Best Value' },
+];
 
 const SAVED_CREDENTIALS_KEY = 'upi_saved_login_credentials_v1';
 const REMEMBER_PREF_KEY = 'upi_remember_login_pref_v1';
@@ -95,6 +112,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [regPassword, setRegPassword] = useState('');
   const [regPhone, setRegPhone] = useState('');
   const [regStore, setRegStore] = useState('');
+  const [selectedPlan, setSelectedPlan] = useState<ValidityPlan>('1_month');
   const [showRegPassword, setShowRegPassword] = useState(false);
 
   // UI status
@@ -174,7 +192,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         businessName: regStore,
         role: 'customer',
         status: 'active',
-        validityPlan: 'lifetime',
+        validityPlan: selectedPlan,
       });
 
       setIsLoading(false);
@@ -184,8 +202,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         return;
       }
 
+      const planTitle = PACKAGES.find((p) => p.id === selectedPlan)?.title || '1 Month';
       setSuccessMsg(
-        `Account registered successfully for ${regName}! You can now sign in.`
+        `Account registered successfully for ${regName} (${planTitle} Package)! You can now sign in.`
       );
 
       // Prepopulate login form and switch to login tab
@@ -544,6 +563,91 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 </div>
               </div>
 
+              {/* Package Selection (1 Month: ₹500, 3 Month: ₹1299, 6 Month: ₹2199, 1 Year: ₹2999) */}
+              <div className="bg-emerald-50/60 border border-emerald-200/90 rounded-2xl p-3.5 mt-1">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
+                    <span>Select Package / प्लान चुनें</span>
+                  </label>
+                  {(() => {
+                    const activePkg = PACKAGES.find((p) => p.id === selectedPlan) || PACKAGES[0];
+                    return (
+                      <span className="text-[11px] font-extrabold text-emerald-800 bg-emerald-100/90 border border-emerald-300/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <span>₹{activePkg.price.toLocaleString('en-IN')}</span>
+                        <span className="text-emerald-500">•</span>
+                        <span>{activePkg.duration}</span>
+                      </span>
+                    );
+                  })()}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  {PACKAGES.map((pkg) => {
+                    const isSelected = selectedPlan === pkg.id;
+                    return (
+                      <button
+                        key={pkg.id}
+                        type="button"
+                        onClick={() => setSelectedPlan(pkg.id)}
+                        className={`relative p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer select-none active:scale-97 ${
+                          isSelected
+                            ? 'bg-white border-emerald-600 shadow-sm ring-2 ring-emerald-500/20'
+                            : 'bg-white/80 hover:bg-white border-slate-200/90 text-slate-700'
+                        }`}
+                      >
+                        {pkg.tag && (
+                          <span className="absolute -top-2 right-2 text-[9px] font-black uppercase tracking-tight bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-1.5 py-0.5 rounded-full shadow-2xs">
+                            {pkg.tag}
+                          </span>
+                        )}
+                        <div className="flex items-center justify-between w-full">
+                          <span
+                            className={`text-xs font-black ${
+                              isSelected ? 'text-emerald-950' : 'text-slate-800'
+                            }`}
+                          >
+                            {pkg.title}
+                          </span>
+                          <div
+                            className={`w-4 h-4 rounded-full flex items-center justify-center border transition-all shrink-0 ${
+                              isSelected
+                                ? 'bg-emerald-600 border-emerald-600 text-white'
+                                : 'border-slate-300 bg-white'
+                            }`}
+                          >
+                            {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                          </div>
+                        </div>
+
+                        {/* Price display */}
+                        <div className="mt-1.5 flex items-baseline gap-1.5">
+                          <span
+                            className={`text-sm font-black tracking-tight ${
+                              isSelected ? 'text-emerald-700' : 'text-slate-900'
+                            }`}
+                          >
+                            ₹{pkg.price.toLocaleString('en-IN')}
+                          </span>
+                          {pkg.originalPrice && (
+                            <span className="text-[10px] text-slate-400 line-through font-semibold">
+                              ₹{pkg.originalPrice.toLocaleString('en-IN')}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="mt-1 flex items-center justify-between text-[10px] font-medium text-slate-500">
+                          <span>{pkg.duration}</span>
+                          {pkg.saveText && (
+                            <span className="text-emerald-600 font-bold">{pkg.saveText}</span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Save Name & Password on this device */}
               <div className="pt-0.5 pb-1">
                 <label
@@ -569,7 +673,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 className="w-full mt-2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white font-extrabold text-sm shadow-md shadow-emerald-700/20 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-70"
               >
                 <UserPlus className="w-4 h-4" />
-                <span>{isLoading ? 'Creating account...' : 'Register Account'}</span>
+                <span>
+                  {isLoading
+                    ? 'Creating account...'
+                    : (() => {
+                        const pkg = PACKAGES.find((p) => p.id === selectedPlan) || PACKAGES[0];
+                        return `Register Account (${pkg.title} • ₹${pkg.price.toLocaleString('en-IN')})`;
+                      })()}
+                </span>
               </button>
 
               <div className="text-center pt-1">
