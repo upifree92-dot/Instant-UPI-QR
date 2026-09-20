@@ -232,12 +232,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     setError(null);
     setSuccessMsg(null);
 
-    if (!regName.trim()) {
-      setError('Please enter your Name.');
-      return;
-    }
     if (!regEmail.trim()) {
-      setError('Please enter your Email or User ID.');
+      setError('Please enter your Username or Email ID.');
       return;
     }
     if (!regPassword || regPassword.length < 3) {
@@ -248,15 +244,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
     setIsLoading(true);
 
     setTimeout(() => {
+      // Clean name derived from email/username or given name
+      const rawDerived = regEmail.split('@')[0] || 'User';
       const sanitizedName =
-        regName.replace(/\bfree\b/gi, '').replace(/\s+/g, ' ').trim() || 'Upi';
+        rawDerived.replace(/\bfree\b/gi, '').replace(/\s+/g, ' ').trim() || 'User';
 
       const reg = registerCustomer({
         name: sanitizedName,
-        email: regEmail,
+        email: regEmail.trim(),
         password: regPassword,
-        phone: regPhone,
-        businessName: regStore,
+        phone: regPhone.trim(),
+        businessName: '',
         role: 'customer',
         status: 'pending',
         validityPlan: selectedPlan,
@@ -276,10 +274,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         planTitle: activePkg.title,
         planPrice: activePkg.price,
         phone: regPhone.trim(),
-        store: regStore.trim(),
+        store: '',
       });
       setSuccessMsg(
-        `Registration Submitted! Gmail (${regEmail}) account activation ke liye Admin Panel par bhej diya gaya hai (${activePkg.title} • ₹${activePkg.price}). Admin dwara activate hone ke baad aap login kar sakenge.`
+        `Registration Submitted! Account (${regEmail.trim()}) activation request has been sent to Admin Panel (${activePkg.title} • ₹${activePkg.price}). Once activated, you will be able to log in.`
       );
 
       // Prepopulate login form and switch to login tab
@@ -538,7 +536,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     }}
                     className="w-4 h-4 rounded text-emerald-600 border-slate-300 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
                   />
-                  <span>Save Name & Password (Auto-Fill)</span>
+                  <span>Remember Login (Auto-Fill)</span>
                 </label>
 
                 {hasSavedCredentials && (
@@ -575,37 +573,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           {/* REGISTER FORM */}
           {mode === 'register' && (
             <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
-              {/* Name */}
-              <div>
-                <label
-                  htmlFor="reg-name"
-                  className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1"
-                >
-                  Your Name / Customer Name *
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <User className="w-4 h-4" />
-                  </div>
-                  <input
-                    id="reg-name"
-                    type="text"
-                    value={regName}
-                    onChange={(e) => setRegName(e.target.value)}
-                    placeholder="e.g. Ramesh Kumar"
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white focus:outline-none rounded-xl text-sm font-semibold text-slate-900 transition-colors placeholder:text-slate-400"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Email / User ID */}
+              {/* Username or Email ID */}
               <div>
                 <label
                   htmlFor="reg-email"
                   className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1"
                 >
-                  Email / User ID *
+                  Username or Email ID *
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -616,7 +590,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     type="text"
                     value={regEmail}
                     onChange={(e) => setRegEmail(e.target.value)}
-                    placeholder="e.g. ramesh@gmail.com or ramesh12"
+                    placeholder="Enter username or email"
                     className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white focus:outline-none rounded-xl text-sm font-semibold text-slate-900 transition-colors placeholder:text-slate-400"
                     required
                   />
@@ -640,7 +614,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                     type={showRegPassword ? 'text' : 'password'}
                     value={regPassword}
                     onChange={(e) => setRegPassword(e.target.value)}
-                    placeholder="Create a password"
+                    placeholder="Enter password"
                     className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white focus:outline-none rounded-xl text-sm font-semibold text-slate-900 transition-colors placeholder:text-slate-400"
                     required
                   />
@@ -658,50 +632,26 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
                 </div>
               </div>
 
-              {/* Mobile Phone & Business Name */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div>
-                  <label
-                    htmlFor="reg-phone"
-                    className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1"
-                  >
-                    Mobile Phone (Optional)
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                      <Phone className="w-3.5 h-3.5" />
-                    </div>
-                    <input
-                      id="reg-phone"
-                      type="tel"
-                      value={regPhone}
-                      onChange={(e) => setRegPhone(e.target.value)}
-                      placeholder="9876543210"
-                      className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white focus:outline-none rounded-xl text-xs font-semibold text-slate-900"
-                    />
+              {/* Mobile Phone (Optional) */}
+              <div>
+                <label
+                  htmlFor="reg-phone"
+                  className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1"
+                >
+                  Mobile Phone (Optional)
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <Phone className="w-3.5 h-3.5" />
                   </div>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="reg-store"
-                    className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1"
-                  >
-                    Store Name (Optional)
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                      <Store className="w-3.5 h-3.5" />
-                    </div>
-                    <input
-                      id="reg-store"
-                      type="text"
-                      value={regStore}
-                      onChange={(e) => setRegStore(e.target.value)}
-                      placeholder="Sharma Traders"
-                      className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white focus:outline-none rounded-xl text-xs font-semibold text-slate-900"
-                    />
-                  </div>
+                  <input
+                    id="reg-phone"
+                    type="tel"
+                    value={regPhone}
+                    onChange={(e) => setRegPhone(e.target.value)}
+                    placeholder="Enter mobile number (e.g. 8598912555)"
+                    className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-emerald-500 focus:bg-white focus:outline-none rounded-xl text-xs font-semibold text-slate-900"
+                  />
                 </div>
               </div>
 
