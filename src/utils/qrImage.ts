@@ -101,7 +101,7 @@ export async function generateQrImageBlob(
         ctx.fillStyle = '#1e293b';
         ctx.font = 'bold 18px sans-serif';
         ctx.fillText(
-          'Google Pay  •  PhonePe  •  Paytm  •  BHIM  •  Amazon Pay  •  All UPI',
+          'Scan & Pay With Any UPI App',
           width / 2,
           height - 32
         );

@@ -2,7 +2,6 @@ import React, { useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { ShieldCheck } from 'lucide-react';
 import { MerchantConfig } from '../types';
-import { AcceptedUpiApps } from './AcceptedUpiApps';
 
 interface UpiCardProps {
   config: MerchantConfig;
@@ -102,9 +101,6 @@ export const UpiCard: React.FC<UpiCardProps> = ({
           </div>
         )}
       </div>
-
-      {/* Supported UPI Apps Below QR (Paytm, PhonePe, Google Pay, BHIM, etc.) */}
-      <AcceptedUpiApps />
     </div>
   );
 };
